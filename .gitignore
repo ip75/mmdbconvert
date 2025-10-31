@@ -1,8 +1,25 @@
+# Editor and IDE files
 *.swp
+.idea
+.vscode
+
+# Build artifacts
 /build
 /dist
 /cmd/mmdbconvert/mmdbconvert
-/plan.md
+/mmdbconvert
+
+# Dependencies
 /vendor
+
+# Test outputs
+*.test
+*.out
+coverage.txt
+
+# Development files
+/plan.md
 .claude
-.idea
+
+# OS files
+.DS_Store
