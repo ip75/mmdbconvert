@@ -1,0 +1,18 @@
+[commands.prettier-markdown]
+type = "both"
+include = [
+    "**/*.md"
+]
+cmd = [
+    "npx",
+    "prettier",
+    "--parser",
+    "markdown",
+    "--prose-wrap",
+    "always",
+]
+lint-flags = "--check"
+tidy-flags = "--write"
+ok-exit-codes = 0
+lint-failure-exit-codes = 1
+ignore-stderr = ["Code style issues", "npm warn exec"]
