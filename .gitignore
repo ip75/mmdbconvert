@@ -2,5 +2,7 @@
 /build
 /dist
 /cmd/mmdbconvert/mmdbconvert
+/plan.md
 /vendor
+.claude
 .idea
