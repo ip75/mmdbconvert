@@ -1,0 +1,74 @@
+project_name: 'mmdbconvert'
+version: 2
+
+before:
+  hooks:
+    - 'go mod tidy'
+
+builds:
+  - id: 'mmdbconvert'
+    main: './cmd/mmdbconvert/'
+    binary: 'mmdbconvert'
+    goos:
+      - 'darwin'
+      - 'linux'
+      - 'windows'
+    ignore:
+      - goos: 'darwin'
+        goarch: '386'
+
+archives:
+  - id: 'mmdbconvert'
+    builds:
+      - 'mmdbconvert'
+    wrap_in_directory: true
+    format_overrides:
+      - goos: windows
+        formats:
+          - zip
+    files:
+      - 'CHANGELOG.md'
+      - 'LICENSE-APACHE'
+      - 'LICENSE-MIT'
+      - 'README.md'
+      - 'docs/*.md'
+      - 'examples/*.toml'
+
+checksum:
+  name_template: 'checksums.txt'
+
+snapshot:
+  version_template: "{{ .Tag }}-next"
+
+changelog:
+  disable: true
+
+nfpms:
+  - id: 'mmdbconvert'
+    builds:
+      - 'mmdbconvert'
+    vendor: 'MaxMind, Inc.'
+    homepage: 'https://www.maxmind.com/'
+    maintainer: 'MaxMind, Inc. <support@maxmind.com>'
+    description: 'Tool to merge multiple MaxMind MMDB databases and export to CSV or Parquet format.'
+    license: 'Apache 2.0 or MIT'
+    formats:
+      - 'deb'
+      - 'rpm'
+    bindir: '/usr/bin'
+    contents:
+      - src: 'CHANGELOG.md'
+        dst: '/usr/share/doc/mmdbconvert/CHANGELOG.md'
+      - src: 'LICENSE-APACHE'
+        dst: '/usr/share/doc/mmdbconvert/LICENSE-APACHE'
+      - src: 'LICENSE-MIT'
+        dst: '/usr/share/doc/mmdbconvert/LICENSE-MIT'
+      - src: 'README.md'
+        dst: '/usr/share/doc/mmdbconvert/README.md'
+      - src: 'docs/config.md'
+        dst: '/usr/share/doc/mmdbconvert/config.md'
+      - src: 'docs/parquet-queries.md'
+        dst: '/usr/share/doc/mmdbconvert/parquet-queries.md'
+
+release:
+  target_commitish: "{{ .FullCommit }}"
