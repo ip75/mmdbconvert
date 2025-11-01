@@ -13,6 +13,15 @@ import (
 	"github.com/maxmind/mmdbconvert/internal/network"
 )
 
+// Network column type constants.
+const (
+	NetworkColumnCIDR     = "cidr"
+	NetworkColumnStartIP  = "start_ip"
+	NetworkColumnEndIP    = "end_ip"
+	NetworkColumnStartInt = "start_int"
+	NetworkColumnEndInt   = "end_int"
+)
+
 // CSVWriter writes merged MMDB data to CSV format.
 type CSVWriter struct {
 	writer        *csv.Writer
@@ -110,17 +119,17 @@ func (w *CSVWriter) generateNetworkColumnValue(
 	addr := prefix.Addr()
 
 	switch colType {
-	case "cidr":
+	case NetworkColumnCIDR:
 		return prefix.String(), nil
 
-	case "start_ip":
+	case NetworkColumnStartIP:
 		return addr.String(), nil
 
-	case "end_ip":
+	case NetworkColumnEndIP:
 		endIP := network.CalculateEndIP(prefix)
 		return endIP.String(), nil
 
-	case "start_int":
+	case NetworkColumnStartInt:
 		if addr.Is4() {
 			return strconv.FormatUint(uint64(network.IPv4ToUint32(addr)), 10), nil
 		}
@@ -129,7 +138,7 @@ func (w *CSVWriter) generateNetworkColumnValue(
 		// This is primarily for Parquet, but we support it in CSV too
 		return formatIPv6AsInt(addr), nil
 
-	case "end_int":
+	case NetworkColumnEndInt:
 		endIP := network.CalculateEndIP(prefix)
 		if endIP.Is4() {
 			return strconv.FormatUint(uint64(network.IPv4ToUint32(endIP)), 10), nil
