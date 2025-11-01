@@ -5,6 +5,12 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"time"
+
+	"github.com/maxmind/mmdbconvert/internal/config"
+	"github.com/maxmind/mmdbconvert/internal/merger"
+	"github.com/maxmind/mmdbconvert/internal/mmdb"
+	"github.com/maxmind/mmdbconvert/internal/writer"
 )
 
 const version = "0.1.0"
@@ -48,11 +54,108 @@ func main() {
 		configPath = flag.Arg(0)
 	}
 
-	// TODO: Implement main processing logic
-	fmt.Printf("mmdbconvert v%s\n", version)
-	fmt.Printf("Config file: %s\n", configPath)
-	fmt.Printf("Quiet mode: %v\n", quiet)
-	fmt.Println("\nProcessing not yet implemented.")
+	// Run the conversion
+	if err := run(configPath, quiet); err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		os.Exit(1)
+	}
+}
+
+// run performs the main conversion process.
+func run(configPath string, quiet bool) error {
+	startTime := time.Now()
+
+	if !quiet {
+		fmt.Printf("mmdbconvert v%s\n", version)
+		fmt.Printf("Loading configuration from %s...\n", configPath)
+	}
+
+	// Load configuration
+	cfg, err := config.LoadConfig(configPath)
+	if err != nil {
+		return fmt.Errorf("failed to load config: %w", err)
+	}
+
+	if !quiet {
+		fmt.Printf("Output format: %s\n", cfg.Output.Format)
+		fmt.Printf("Output file: %s\n", cfg.Output.File)
+		fmt.Printf("Databases: %d\n", len(cfg.Databases))
+		fmt.Printf("Data columns: %d\n", len(cfg.Columns))
+		fmt.Printf("Network columns: %d\n", len(cfg.Network.Columns))
+		fmt.Println()
+	}
+
+	// Open MMDB databases
+	if !quiet {
+		fmt.Println("Opening MMDB databases...")
+	}
+
+	databases := map[string]string{}
+	for _, db := range cfg.Databases {
+		databases[db.Name] = db.Path
+		if !quiet {
+			fmt.Printf("  - %s: %s\n", db.Name, db.Path)
+		}
+	}
+
+	readers, err := mmdb.OpenDatabases(databases)
+	if err != nil {
+		return fmt.Errorf("failed to open databases: %w", err)
+	}
+	defer readers.Close()
+
+	if !quiet {
+		fmt.Println()
+		fmt.Println("Creating output file...")
+	}
+
+	// Create output file
+	outputFile, err := os.Create(cfg.Output.File)
+	if err != nil {
+		return fmt.Errorf("failed to create output file: %w", err)
+	}
+	defer outputFile.Close()
+
+	// Create writer based on format
+	var rowWriter merger.RowWriter
+	switch cfg.Output.Format {
+	case "csv":
+		rowWriter = writer.NewCSVWriter(outputFile, cfg)
+	case "parquet":
+		parquetWriter, err := writer.NewParquetWriter(outputFile, cfg)
+		if err != nil {
+			return fmt.Errorf("failed to create Parquet writer: %w", err)
+		}
+		rowWriter = parquetWriter
+	default:
+		return fmt.Errorf("unsupported output format: %s", cfg.Output.Format)
+	}
+
+	if !quiet {
+		fmt.Println("Merging databases and writing output...")
+	}
+
+	// Create merger and run
+	m := merger.NewMerger(readers, cfg, rowWriter)
+	if err := m.Merge(); err != nil {
+		return fmt.Errorf("merge failed: %w", err)
+	}
+
+	// Flush writer
+	if flusher, ok := rowWriter.(interface{ Flush() error }); ok {
+		if err := flusher.Flush(); err != nil {
+			return fmt.Errorf("failed to flush output: %w", err)
+		}
+	}
+
+	if !quiet {
+		elapsed := time.Since(startTime)
+		fmt.Println()
+		fmt.Printf("✓ Successfully completed in %v\n", elapsed.Round(time.Millisecond))
+		fmt.Printf("Output written to: %s\n", cfg.Output.File)
+	}
+
+	return nil
 }
 
 func usage() {

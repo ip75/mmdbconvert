@@ -1,6 +1,7 @@
 package writer
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"net/netip"
@@ -122,18 +123,18 @@ func (w *ParquetWriter) generateNetworkColumnValue(
 		if addr.Is4() {
 			return int64(network.IPv4ToUint32(addr)), nil
 		}
-		// For IPv6, return as binary (16 bytes)
-		bytes := addr.As16()
-		return bytes[:], nil
+		return nil, errors.New(
+			"start_int column type only supports IPv4; use start_ip for IPv6 addresses",
+		)
 
 	case NetworkColumnEndInt:
 		endIP := network.CalculateEndIP(prefix)
 		if endIP.Is4() {
 			return int64(network.IPv4ToUint32(endIP)), nil
 		}
-		// For IPv6, return as binary (16 bytes)
-		bytes := endIP.As16()
-		return bytes[:], nil
+		return nil, errors.New(
+			"end_int column type only supports IPv4; use end_ip for IPv6 addresses",
+		)
 
 	default:
 		return nil, fmt.Errorf("unknown network column type: %s", colType)
