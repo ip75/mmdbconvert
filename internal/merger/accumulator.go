@@ -1,4 +1,3 @@
-// Package merger provides network merging and accumulation functionality.
 package merger
 
 import (

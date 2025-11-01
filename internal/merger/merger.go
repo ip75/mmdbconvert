@@ -1,3 +1,9 @@
+// Package merger implements streaming network merge algorithm using nested iteration.
+//
+// The merger processes networks from multiple MMDB databases, resolving overlaps
+// by selecting the smallest network at each point. Adjacent networks with identical
+// data are automatically merged for compact output. The streaming accumulator ensures
+// O(1) memory usage regardless of database size.
 package merger
 
 import (
