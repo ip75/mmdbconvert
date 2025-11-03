@@ -1,7 +1,7 @@
 # mmdbconvert
 
-A command-line tool to merge multiple MaxMind MMDB databases and export to CSV
-or Parquet format.
+A command-line tool to merge multiple MaxMind MMDB databases and export to CSV,
+Parquet, or MMDB format.
 
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Go Version](https://img.shields.io/badge/Go-1.25%2B-00ADD8?logo=go)](https://golang.org)
@@ -14,10 +14,11 @@ or Parquet format.
   to smallest blocks
 - ✅ **Adjacent network merging** - Combines adjacent networks with identical
   data for compact output
-- ✅ **CSV and Parquet output** - Flexible export formats for different use
-  cases
+- ✅ **Multiple output formats** - Export to CSV, Parquet, or MMDB format
 - ✅ **Query-optimized Parquet** - Integer columns enable 10-100x faster IP
   lookups
+- ✅ **Type-preserving MMDB output** - Perfect type preservation for merged
+  databases
 - ✅ **Flexible column mapping** - Extract any fields from MMDB databases using
   JSON paths
 - ✅ **IPv4 and IPv6 support** - Handle both IP versions seamlessly
@@ -170,6 +171,55 @@ path = ["location", "latitude"]
 type = "float64"
 ```
 
+### MMDB Output Example
+
+```toml
+[output]
+format = "mmdb"
+file = "merged.mmdb"
+
+[output.mmdb]
+database_type = "GeoIP2-City"
+description = { en = "Merged GeoIP Database" }
+record_size = 28
+
+[[databases]]
+name = "city"
+path = "GeoIP2-City.mmdb"
+
+# Use output_path to create nested structure
+[[columns]]
+name = "country_code"
+database = "city"
+path = ["country", "iso_code"]
+output_path = ["country", "iso_code"]
+
+[[columns]]
+name = "city_name"
+database = "city"
+path = ["city", "names", "en"]
+output_path = ["city", "names", "en"]
+
+[[columns]]
+name = "latitude"
+database = "city"
+path = ["location", "latitude"]
+output_path = ["location", "latitude"]
+
+[[columns]]
+name = "longitude"
+database = "city"
+path = ["location", "longitude"]
+output_path = ["location", "longitude"]
+```
+
+**MMDB output features:**
+
+- Perfect type preservation from source databases
+- Support for nested structures via `output_path`
+- Compatible with all MMDB readers (libmaxminddb, etc.)
+- Configurable record size (24, 28, or 32 bits)
+
 ## Querying Parquet Files
 
 Parquet files generated with integer columns (`start_int`, `end_int`) support
@@ -319,6 +369,17 @@ merged database provides:
 - Single query-optimized Parquet file for fast lookups
 - Non-overlapping networks for accurate IP matching
 
+### Creating Custom MMDB Databases
+
+Merge multiple MMDB databases into a single custom database with perfect type
+preservation:
+
+- Combine multiple data sources (GeoIP, ISP, ASN, etc.)
+- Create application-specific databases with only needed fields
+- Maintain exact data types from source databases
+- Deploy merged databases with existing MMDB readers
+- No performance overhead compared to original databases
+
 ### Analytics Pipelines
 
 Export MMDB databases to Parquet for use in analytics pipelines:
@@ -449,6 +510,7 @@ Built with:
 - [go-toml](https://github.com/pelletier/go-toml) - TOML configuration parsing
 - [maxminddb-golang](https://github.com/oschwald/maxminddb-golang) - MMDB
   database reading
+- [mmdbwriter](https://github.com/maxmind/mmdbwriter) - MMDB database writing
 - [parquet-go](https://github.com/parquet-go/parquet-go) - Parquet file writing
 
 ## Support

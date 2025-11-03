@@ -31,7 +31,7 @@ The `[output]` section defines where and how data should be written.
 
 ```toml
 [output]
-format = "csv"    # Output format: "csv" or "parquet"
+format = "csv"    # Output format: "csv", "parquet", or "mmdb"
 file = "output.csv"  # Output file path (use this for a combined file)
 # ipv4_file = "output_ipv4.csv"  # Optional IPv4-only file (set both ipv4_file and ipv6_file, omit file)
 # ipv6_file = "output_ipv6.csv"  # Optional IPv6-only file (set both ipv4_file and ipv6_file, omit file)
@@ -64,6 +64,29 @@ When `format = "parquet"`, you can specify Parquet-specific options:
 [output.parquet]
 compression = "snappy"  # Compression: "none", "snappy", "gzip", "lz4", "zstd" (default: "snappy")
 ```
+
+#### MMDB Options
+
+When `format = "mmdb"`, you can specify MMDB-specific options:
+
+```toml
+[output.mmdb]
+database_type = "GeoIP2-City"  # Database type (required)
+description = { en = "Custom Database", de = "Benutzerdefinierte Datenbank" }  # Descriptions by language
+languages = ["en", "de"]  # List of languages (auto-populated from description if omitted)
+record_size = 28  # Record size: 24, 28, or 32 (default: 28)
+include_reserved_networks = false  # Include reserved networks (default: false)
+```
+
+**Notes:**
+
+- `database_type` is required for MMDB output
+- `languages` is auto-populated from `description` keys if not specified
+- Split IPv4/IPv6 files are not supported for MMDB output (must use single
+  `file`)
+- Network columns are not used for MMDB output (data is written by prefix)
+- Type hints are not allowed for MMDB output (types are preserved from source
+  databases)
 
 #### Splitting IPv4 and IPv6 Output
 
@@ -144,8 +167,18 @@ after network columns, in the order defined.
 [[columns]]
 name = "country_code"        # Output column name
 database = "enterprise"      # Database to read from (must match a database name)
-path = ["country", "iso_code"]   # Path segments to the field
+path = ["country", "iso_code"]   # Path segments to the field in source database
+output_path = ["country", "iso_code"]  # Optional: path for MMDB output (defaults to [name])
 ```
+
+**Field descriptions:**
+
+- `name` - Column name for CSV/Parquet output
+- `database` - Database to read from (must match a database name)
+- `path` - Path to field in source MMDB database
+- `output_path` - (Optional) Path for nested structure in MMDB output. If not
+  specified, defaults to a flat structure using `[name]` as the path. Only
+  relevant for MMDB output format.
 
 #### Path Syntax
 
@@ -359,6 +392,93 @@ name = "country_name_de"
 database = "enterprise"
 path = ["country", "names", "de"]
 ```
+
+### Example 4: MMDB Output with Flat Structure
+
+```toml
+[output]
+format = "mmdb"
+file = "merged.mmdb"
+
+[output.mmdb]
+database_type = "GeoIP2-City"
+description = { en = "Merged GeoIP Database" }
+
+[[databases]]
+name = "city"
+path = "GeoIP2-City.mmdb"
+
+# Flat structure: each column becomes a top-level field
+[[columns]]
+name = "country_code"
+database = "city"
+path = ["country", "iso_code"]
+
+[[columns]]
+name = "city_name"
+database = "city"
+path = ["city", "names", "en"]
+
+[[columns]]
+name = "latitude"
+database = "city"
+path = ["location", "latitude"]
+
+[[columns]]
+name = "longitude"
+database = "city"
+path = ["location", "longitude"]
+```
+
+### Example 5: MMDB Output with Nested Structure
+
+```toml
+[output]
+format = "mmdb"
+file = "nested.mmdb"
+
+[output.mmdb]
+database_type = "GeoIP2-City"
+description = { en = "Nested Structure Example", de = "Beispiel für verschachtelte Strukturen" }
+record_size = 28
+include_reserved_networks = false
+
+[[databases]]
+name = "city"
+path = "GeoIP2-City.mmdb"
+
+# Nested structure: use output_path to create hierarchical data
+[[columns]]
+name = "country_code"
+database = "city"
+path = ["country", "iso_code"]
+output_path = ["country", "iso_code"]  # Creates nested {"country": {"iso_code": "US"}}
+
+[[columns]]
+name = "city_name"
+database = "city"
+path = ["city", "names", "en"]
+output_path = ["city", "names", "en"]  # Creates nested {"city": {"names": {"en": "New York"}}}
+
+[[columns]]
+name = "latitude"
+database = "city"
+path = ["location", "latitude"]
+output_path = ["location", "latitude"]  # Creates nested {"location": {"latitude": 40.7128}}
+
+[[columns]]
+name = "longitude"
+database = "city"
+path = ["location", "longitude"]
+output_path = ["location", "longitude"]  # Creates nested {"location": {"longitude": -74.0060}}
+```
+
+**Notes on MMDB output:**
+
+- Types are preserved from source databases (uint16, float32, etc.)
+- `output_path` determines the structure in the output MMDB
+- Without `output_path`, fields use a flat structure with `name` as the key
+- Multiple columns can share parent paths to build nested structures
 
 ## Network Merging Behavior
 
