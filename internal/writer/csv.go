@@ -10,6 +10,7 @@ import (
 	"math/big"
 	"net/netip"
 	"strconv"
+	"sync"
 
 	"github.com/maxmind/mmdbwriter/mmdbtype"
 	"go4.org/netipx"
@@ -34,6 +35,7 @@ type CSVWriter struct {
 	headerWritten bool
 	headerEnabled bool
 	rangeCapable  bool
+	bigIntPool    *sync.Pool // Pool of big.Int for IPv6 integer conversion
 }
 
 // NewCSVWriter creates a new CSV writer.
@@ -66,6 +68,11 @@ func NewCSVWriter(w io.Writer, cfg *config.Config) *CSVWriter {
 		headerEnabled: headerEnabled,
 		headerWritten: !headerEnabled,
 		rangeCapable:  rangeCapable,
+		bigIntPool: &sync.Pool{
+			New: func() any {
+				return new(big.Int)
+			},
+		},
 	}
 }
 
@@ -210,14 +217,14 @@ func (w *CSVWriter) generateNetworkColumnValue(
 		if addr.Is4() {
 			return strconv.FormatUint(uint64(network.IPv4ToUint32(addr)), 10), nil
 		}
-		return formatIPv6AsInt(addr), nil
+		return w.formatIPv6AsInt(addr), nil
 
 	case NetworkColumnEndInt:
 		endIP := netipx.PrefixLastIP(prefix)
 		if endIP.Is4() {
 			return strconv.FormatUint(uint64(network.IPv4ToUint32(endIP)), 10), nil
 		}
-		return formatIPv6AsInt(endIP), nil
+		return w.formatIPv6AsInt(endIP), nil
 
 	default:
 		return "", fmt.Errorf("unknown network column type: %s", colType)
@@ -238,20 +245,29 @@ func (w *CSVWriter) generateRangeNetworkValue(
 		if start.Is4() {
 			return strconv.FormatUint(uint64(network.IPv4ToUint32(start)), 10), nil
 		}
-		return formatIPv6AsInt(start), nil
+		return w.formatIPv6AsInt(start), nil
 	case NetworkColumnEndInt:
 		if end.Is4() {
 			return strconv.FormatUint(uint64(network.IPv4ToUint32(end)), 10), nil
 		}
-		return formatIPv6AsInt(end), nil
+		return w.formatIPv6AsInt(end), nil
 	default:
 		return "", fmt.Errorf("unsupported network column type '%s' for range output", colType)
 	}
 }
 
-// formatIPv6AsInt formats an IPv6 address as a decimal integer string.
-func formatIPv6AsInt(addr netip.Addr) string {
-	var i big.Int
+// formatIPv6AsInt formats an IPv6 address as a decimal integer string using a
+// pooled big.Int to reduce allocations.
+func (w *CSVWriter) formatIPv6AsInt(addr netip.Addr) string {
+	// Get a big.Int from the pool
+	i := w.bigIntPool.Get().(*big.Int)
+	defer func() {
+		// Reset and return to pool
+		i.SetInt64(0)
+		w.bigIntPool.Put(i)
+	}()
+
+	// Convert IPv6 address to big.Int
 	b := addr.As16()
 	i.SetBytes(b[:])
 	return i.String()
