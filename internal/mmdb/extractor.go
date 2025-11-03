@@ -1,7 +1,6 @@
 package mmdb
 
 import (
-	"errors"
 	"fmt"
 	"net/netip"
 	"strconv"
@@ -45,8 +44,9 @@ func ExtractValue(
 }
 
 func normalizeSegments(path []any) ([]any, error) {
+	// Empty path is allowed - it means "decode entire record"
 	if len(path) == 0 {
-		return nil, errors.New("path must contain at least one segment")
+		return []any{}, nil
 	}
 
 	segments := make([]any, len(path))

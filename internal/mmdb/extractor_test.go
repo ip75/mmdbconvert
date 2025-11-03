@@ -15,9 +15,10 @@ func TestNormalizeSegments(t *testing.T) {
 		wantErr  bool
 	}{
 		{
-			name:    "empty path",
-			path:    []any{},
-			wantErr: true,
+			name:     "empty path",
+			path:     []any{},
+			expected: []any{},
+			wantErr:  false,
 		},
 		{
 			name:     "simple path",

@@ -502,23 +502,7 @@ path = ["country", "iso_code"]
 `,
 			expectError: "column database is required",
 		},
-		{
-			name: "missing column path",
-			toml: `
-[output]
-format = "csv"
-file = "output.csv"
-
-[[databases]]
-name = "geo"
-path = "/path/to/geo.mmdb"
-
-[[columns]]
-name = "country"
-database = "geo"
-`,
-			expectError: "column path is required",
-		},
+		// Note: missing column path is now valid - path = [] means "copy entire record"
 		{
 			name: "invalid network column type",
 			toml: `

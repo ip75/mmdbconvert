@@ -88,13 +88,11 @@ type Column struct {
 type Path []any
 
 // UnmarshalTOML implements toml.Unmarshaler allowing mixed string/int arrays.
+// Empty arrays are allowed - path = [] means "copy entire record".
 func (p *Path) UnmarshalTOML(v any) error {
 	arr, ok := v.([]any)
 	if !ok {
 		return errors.New("path must be an array")
-	}
-	if len(arr) == 0 {
-		return errors.New("path array must not be empty")
 	}
 
 	segments := make([]any, len(arr))
@@ -347,9 +345,7 @@ func validate(config *Config) error {
 		if col.Database == "" {
 			return fmt.Errorf("column database is required for column '%s'", col.Name)
 		}
-		if len(col.Path) == 0 {
-			return fmt.Errorf("column path is required for column '%s'", col.Name)
-		}
+		// Empty path is allowed - path = [] means "copy entire record"
 
 		// Validate database reference
 		if !dbNames[col.Database] {
@@ -381,10 +377,7 @@ func validate(config *Config) error {
 		}
 		dataColNames[col.Name] = true
 
-		// Validate output_path if set
-		if col.OutputPath != nil && len(*col.OutputPath) == 0 {
-			return fmt.Errorf("column '%s': output_path must not be empty", col.Name)
-		}
+		// Empty output_path is allowed - it means merge into root for MMDB output
 	}
 
 	return nil

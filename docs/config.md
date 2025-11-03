@@ -187,6 +187,8 @@ Paths are defined as TOML arrays. Each element represents one traversal step:
 - Strings access map keys (e.g., `"country"`, `"names"`)
 - Integers access array indices (supports negative indices)
 - Strings are used verbatim, so keys may include `/` without escaping
+- **Empty array** (`path = []`) means "copy entire record" - extracts all data
+  from the MMDB record as a map
 
 **Examples:**
 
@@ -202,7 +204,55 @@ path = ["subdivisions", 0, "names", "en"]
 
 # Deep nesting
 path = ["location", "latitude"]
+
+# Copy entire record
+path = []
 ```
+
+#### Copying Entire Records
+
+Use `path = []` to copy all data from an MMDB record. This is useful when
+merging entire databases:
+
+```toml
+[[columns]]
+name = "all_enterprise_data"
+database = "enterprise"
+path = []  # Copy entire record from Enterprise database
+```
+
+**For MMDB output**, control where the data is placed using `output_path`:
+
+- `output_path = []` - Merge all fields into root of output MMDB
+- `output_path = ["some", "path"]` - Place all fields nested at specified path
+- If `output_path` is not specified, defaults to `[name]` (single-level nesting)
+
+**Map merging behavior:**
+
+When multiple columns target the same path with maps, they are merged
+recursively:
+
+- Non-conflicting keys are combined
+- Nested maps are merged recursively
+- Conflicting keys (same key, different non-map values) cause an error
+
+```toml
+# Example: Merge Enterprise data at root + Anonymous IP data under traits
+[[columns]]
+name = "enterprise_all"
+database = "enterprise"
+path = []
+output_path = []  # Merge into root
+
+[[columns]]
+name = "anonymous_all"
+database = "anonymous"
+path = []
+output_path = ["traits"]  # Nest under traits
+```
+
+**For CSV/Parquet output**, the entire map is JSON-encoded as a string, just
+like other complex values.
 
 #### Data Types
 
@@ -479,6 +529,67 @@ output_path = ["location", "longitude"]  # Creates nested {"location": {"longitu
 - `output_path` determines the structure in the output MMDB
 - Without `output_path`, fields use a flat structure with `name` as the key
 - Multiple columns can share parent paths to build nested structures
+
+### Example 6: Copying Entire Databases with path = []
+
+```toml
+[output]
+format = "mmdb"
+file = "enterprise-with-anonymous.mmdb"
+
+[output.mmdb]
+database_type = "GeoIP2-Enterprise"
+description = { en = "Enterprise + Anonymous IP Merged" }
+record_size = 28
+
+[[databases]]
+name = "enterprise"
+path = "GeoIP2-Enterprise.mmdb"
+
+[[databases]]
+name = "anonymous"
+path = "GeoIP2-Anonymous-IP.mmdb"
+
+# Copy all Enterprise fields to root of output MMDB
+[[columns]]
+name = "enterprise_all"
+database = "enterprise"
+path = []           # Copy entire record
+output_path = []    # Merge into root
+
+# Copy all Anonymous IP fields nested under traits
+[[columns]]
+name = "anonymous_all"
+database = "anonymous"
+path = []           # Copy entire record
+output_path = ["traits"]  # Place under traits map
+```
+
+This configuration creates a merged MMDB where:
+
+- All Enterprise database fields appear at the root level (country, city,
+  location, etc.)
+- All Anonymous IP fields are nested under `traits` (e.g.,
+  `traits.is_anonymous`, `traits.is_anonymous_vpn`)
+- If field names conflict at the same level, the tool exits with a clear error
+  message
+- Nested maps are merged recursively, so multiple columns can contribute to the
+  same parent map
+
+**Resulting structure:**
+
+```json
+{
+  "country": {"iso_code": "US", "names": {...}},
+  "city": {"names": {...}},
+  "location": {"latitude": 37.751, "longitude": -97.822},
+  "traits": {
+    "is_anonymous": true,
+    "is_anonymous_vpn": false,
+    "is_hosting_provider": false
+  }
+}
+```
 
 ## Network Merging Behavior
 
