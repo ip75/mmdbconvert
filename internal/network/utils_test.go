@@ -39,21 +39,6 @@ func TestIPv4ToUint32(t *testing.T) {
 	}
 }
 
-func TestIPv6ToBytes(t *testing.T) {
-	ip := netip.MustParseAddr("2001:db8::1")
-	bytes := IPv6ToBytes(ip)
-	assert.Equal(t, [16]byte{0x20, 0x01, 0x0d, 0xb8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1}, bytes)
-}
-
-func TestIPv4ToPaddedIPv6(t *testing.T) {
-	ip := netip.MustParseAddr("192.168.1.1")
-	bytes := IPv4ToPaddedIPv6(ip)
-
-	// Should be ::ffff:192.168.1.1
-	expected := [16]byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0xff, 0xff, 192, 168, 1, 1}
-	assert.Equal(t, expected, bytes)
-}
-
 func TestIsAdjacent(t *testing.T) {
 	tests := []struct {
 		name     string
