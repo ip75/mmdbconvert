@@ -54,54 +54,6 @@ func TestIPv4ToPaddedIPv6(t *testing.T) {
 	assert.Equal(t, expected, bytes)
 }
 
-func TestCalculateEndIP(t *testing.T) {
-	tests := []struct {
-		name     string
-		prefix   string
-		expected string
-	}{
-		{
-			name:     "IPv4 /32",
-			prefix:   "192.168.1.1/32",
-			expected: "192.168.1.1",
-		},
-		{
-			name:     "IPv4 /24",
-			prefix:   "192.168.1.0/24",
-			expected: "192.168.1.255",
-		},
-		{
-			name:     "IPv4 /16",
-			prefix:   "10.0.0.0/16",
-			expected: "10.0.255.255",
-		},
-		{
-			name:     "IPv4 /23",
-			prefix:   "10.0.0.0/23",
-			expected: "10.0.1.255",
-		},
-		{
-			name:     "IPv6 /128",
-			prefix:   "2001:db8::1/128",
-			expected: "2001:db8::1",
-		},
-		{
-			name:     "IPv6 /64",
-			prefix:   "2001:db8::/64",
-			expected: "2001:db8::ffff:ffff:ffff:ffff",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			prefix := netip.MustParsePrefix(tt.prefix)
-			result := CalculateEndIP(prefix)
-			expected := netip.MustParseAddr(tt.expected)
-			assert.Equal(t, expected, result)
-		})
-	}
-}
-
 func TestIsAdjacent(t *testing.T) {
 	tests := []struct {
 		name     string

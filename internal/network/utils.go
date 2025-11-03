@@ -38,39 +38,6 @@ func IPv4ToPaddedIPv6(addr netip.Addr) [16]byte {
 	return result
 }
 
-// CalculateEndIP returns the last IP address in a CIDR range.
-func CalculateEndIP(prefix netip.Prefix) netip.Addr {
-	addr := prefix.Addr()
-	prefixBits := prefix.Bits()
-
-	if addr.Is4() {
-		start := IPv4ToUint32(addr)
-		// Calculate the number of addresses in the prefix
-		ones := prefixBits
-		hostBits := 32 - ones
-		size := uint32(1) << hostBits
-		end := start + size - 1
-		return uint32ToIPv4(end)
-	}
-
-	// IPv6
-	start := IPv6ToBytes(addr)
-	ones := prefixBits
-	hostBits := 128 - ones
-
-	// Add (2^hostBits - 1) to the start address
-	// Work from right to left (least significant bytes)
-	carry := uint64(1)
-	for i := range hostBits {
-		byteIdx := 15 - (i / 8)
-		//nolint:gosec // Modulo operation result is always < 8
-		bitIdx := uint(i % 8)
-		start[byteIdx] |= byte(carry << bitIdx)
-	}
-
-	return netip.AddrFrom16(start)
-}
-
 // IsAdjacent checks if two IP addresses are consecutive (no gap between them).
 func IsAdjacent(endIP, startIP netip.Addr) bool {
 	if endIP.Is4() != startIP.Is4() {
@@ -95,11 +62,4 @@ func SmallestNetwork(a, b netip.Prefix) netip.Prefix {
 		return a
 	}
 	return b
-}
-
-// uint32ToIPv4 converts a uint32 to an IPv4 address.
-func uint32ToIPv4(ip uint32) netip.Addr {
-	var bytes [4]byte
-	binary.BigEndian.PutUint32(bytes[:], ip)
-	return netip.AddrFrom4(bytes)
 }

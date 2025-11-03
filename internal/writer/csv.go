@@ -203,7 +203,7 @@ func (w *CSVWriter) generateNetworkColumnValue(
 		return addr.String(), nil
 
 	case NetworkColumnEndIP:
-		endIP := network.CalculateEndIP(prefix)
+		endIP := netipx.PrefixLastIP(prefix)
 		return endIP.String(), nil
 
 	case NetworkColumnStartInt:
@@ -213,7 +213,7 @@ func (w *CSVWriter) generateNetworkColumnValue(
 		return formatIPv6AsInt(addr), nil
 
 	case NetworkColumnEndInt:
-		endIP := network.CalculateEndIP(prefix)
+		endIP := netipx.PrefixLastIP(prefix)
 		if endIP.Is4() {
 			return strconv.FormatUint(uint64(network.IPv4ToUint32(endIP)), 10), nil
 		}

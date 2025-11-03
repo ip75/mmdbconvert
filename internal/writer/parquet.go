@@ -10,6 +10,7 @@ import (
 	"github.com/maxmind/mmdbwriter/mmdbtype"
 	"github.com/parquet-go/parquet-go"
 	"github.com/parquet-go/parquet-go/compress"
+	"go4.org/netipx"
 
 	"github.com/maxmind/mmdbconvert/internal/config"
 	"github.com/maxmind/mmdbconvert/internal/network"
@@ -143,7 +144,7 @@ func (w *ParquetWriter) generateNetworkColumnValue(
 		return addr.String(), nil
 
 	case NetworkColumnEndIP:
-		endIP := network.CalculateEndIP(prefix)
+		endIP := netipx.PrefixLastIP(prefix)
 		return endIP.String(), nil
 
 	case NetworkColumnStartInt:
@@ -166,7 +167,7 @@ func (w *ParquetWriter) generateNetworkColumnValue(
 		)
 
 	case NetworkColumnEndInt:
-		endIP := network.CalculateEndIP(prefix)
+		endIP := netipx.PrefixLastIP(prefix)
 		if endIP.Is4() {
 			if w.ipVersion == ipVersion6 {
 				return nil, errors.New("encountered IPv4 address in IPv6-specific writer")

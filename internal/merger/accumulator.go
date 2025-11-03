@@ -54,7 +54,7 @@ func (a *Accumulator) Process(prefix netip.Prefix, data map[string]any) error {
 	}
 
 	addr := prefix.Addr()
-	endIP := network.CalculateEndIP(prefix)
+	endIP := netipx.PrefixLastIP(prefix)
 
 	// First network
 	if a.current == nil {
