@@ -24,6 +24,7 @@ Parquet, or MMDB format.
   JSON paths
 - ✅ **IPv4 and IPv6 support** - Handle both IP versions seamlessly
 - ✅ **Streaming architecture** - O(1) memory usage regardless of database size
+  (for CSV and Parquet only)
 - ✅ **Type hints for Parquet** - Native int64, float64, bool types for
   efficient storage
 
@@ -404,6 +405,7 @@ Convert MMDB databases to CSV/Parquet for loading into data warehouses:
 ### Memory Efficiency
 
 - **O(1) memory usage** - Streaming architecture processes networks on-the-fly
+  (for CSV and Parquet only)
 - Typical memory: < 100 MB regardless of database size
 - Handles databases with millions of networks
 
@@ -440,7 +442,8 @@ mmdbconvert uses a streaming accumulator algorithm:
 2. **Smallest network selection** - Always chooses most specific network block
 3. **Data extraction** from all databases for each network
 4. **Adjacent network merging** - Combines networks with identical data
-5. **Immediate output** - Writes rows as soon as data changes (O(1) memory)
+5. **Immediate output** - Writes rows as soon as data changes (O(1) memory for
+   CSV and Parquet)
 
 ### Non-Overlapping Networks
 
