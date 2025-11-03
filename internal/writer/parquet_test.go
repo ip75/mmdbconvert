@@ -6,6 +6,7 @@ import (
 	"net/netip"
 	"testing"
 
+	"github.com/maxmind/mmdbwriter/mmdbtype"
 	"github.com/parquet-go/parquet-go"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -167,11 +168,11 @@ func TestParquetWriter_DataTypes(t *testing.T) {
 
 	prefix := netip.MustParsePrefix("10.0.0.0/24")
 	data := map[string]any{
-		"string_col": "hello",
-		"int_col":    int64(42),
-		"float_col":  float64(3.14),
-		"bool_col":   true,
-		"binary_col": []byte{0xde, 0xad, 0xbe, 0xef},
+		"string_col": mmdbtype.String("hello"),
+		"int_col":    mmdbtype.Uint32(42),
+		"float_col":  mmdbtype.Float64(3.14),
+		"bool_col":   mmdbtype.Bool(true),
+		"binary_col": mmdbtype.Bytes([]byte{0xde, 0xad, 0xbe, 0xef}),
 	}
 
 	err = writer.WriteRow(prefix, data)
@@ -367,16 +368,16 @@ func TestConvertToParquetType(t *testing.T) {
 		wantErr  bool
 	}{
 		{"nil", nil, "string", nil, false},
-		{"string", "hello", "string", "hello", false},
-		{"int to int64", int(42), "int64", int64(42), false},
-		{"int32 to int64", int32(42), "int64", int64(42), false},
-		{"uint to int64", uint(42), "int64", int64(42), false},
-		{"float32 to float64", float32(3.14), "float64", float64(float32(3.14)), false},
-		{"int to float64", int(42), "float64", float64(42), false},
-		{"bool", true, "bool", true, false},
-		{"binary", []byte{0xaa, 0xbb}, "binary", []byte{0xaa, 0xbb}, false},
-		{"invalid int conversion", "hello", "int64", nil, true},
-		{"invalid bool conversion", "true", "bool", nil, true},
+		{"string", mmdbtype.String("hello"), "string", "hello", false},
+		{"int32 to int64", mmdbtype.Int32(42), "int64", int64(42), false},
+		{"uint16 to int64", mmdbtype.Uint16(42), "int64", int64(42), false},
+		{"uint32 to int64", mmdbtype.Uint32(42), "int64", int64(42), false},
+		{"float32 to float64", mmdbtype.Float32(3.14), "float64", float64(float32(3.14)), false},
+		{"uint32 to float64", mmdbtype.Uint32(42), "float64", float64(42), false},
+		{"bool", mmdbtype.Bool(true), "bool", true, false},
+		{"binary", mmdbtype.Bytes([]byte{0xaa, 0xbb}), "binary", []byte{0xaa, 0xbb}, false},
+		{"invalid int conversion", mmdbtype.String("hello"), "int64", nil, true},
+		{"invalid bool conversion", mmdbtype.String("true"), "bool", nil, true},
 	}
 
 	for _, tt := range tests {

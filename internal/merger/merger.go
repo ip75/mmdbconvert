@@ -12,6 +12,7 @@ import (
 	"net/netip"
 	"strings"
 
+	"github.com/maxmind/mmdbwriter/mmdbtype"
 	"github.com/oschwald/maxminddb-golang/v2"
 
 	"github.com/maxmind/mmdbconvert/internal/config"
@@ -26,6 +27,7 @@ type Merger struct {
 	acc         *Accumulator
 	readersList []*mmdb.Reader // Ordered list of readers for iteration
 	dbNamesList []string       // Corresponding database names
+	unmarshaler *mmdbtype.Unmarshaler
 }
 
 // NewMerger creates a new merger instance.
@@ -36,9 +38,10 @@ func NewMerger(readers *mmdb.Readers, cfg *config.Config, writer RowWriter) *Mer
 	}
 
 	return &Merger{
-		readers: readers,
-		config:  cfg,
-		acc:     NewAccumulator(writer, includeEmptyRows),
+		readers:     readers,
+		config:      cfg,
+		acc:         NewAccumulator(writer, includeEmptyRows),
+		unmarshaler: mmdbtype.NewUnmarshaler(),
 	}
 }
 
@@ -165,8 +168,8 @@ func (m *Merger) extractAndProcess(prefix netip.Prefix) error {
 			)
 		}
 
-		// Extract the value (this is the single decode per column)
-		value, err := mmdb.ExtractValue(reader, prefix, column.Path.Segments(), column.Type)
+		// Extract the value as mmdbtype.DataType
+		value, err := mmdb.ExtractValue(reader, prefix, column.Path.Segments(), m.unmarshaler)
 		if err != nil {
 			return fmt.Errorf(
 				"failed to extract column '%s' for network %s: %w",

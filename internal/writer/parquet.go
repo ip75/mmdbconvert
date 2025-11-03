@@ -4,8 +4,10 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math/big"
 	"net/netip"
 
+	"github.com/maxmind/mmdbwriter/mmdbtype"
 	"github.com/parquet-go/parquet-go"
 	"github.com/parquet-go/parquet-go/compress"
 
@@ -269,8 +271,6 @@ func buildDataNode(col config.Column) (parquet.Node, error) {
 }
 
 // convertToParquetType converts a value to the appropriate Parquet type.
-//
-//nolint:gocyclo // Type conversion inherently requires many cases
 func convertToParquetType(value any, typeHint string) (any, error) {
 	if value == nil {
 		return nil, nil
@@ -278,81 +278,65 @@ func convertToParquetType(value any, typeHint string) (any, error) {
 
 	// If no type hint, return as-is (will be string)
 	if typeHint == "" || typeHint == "string" {
-		return convertToString(value), nil
+		return convertToString(value)
 	}
 
 	switch typeHint {
 	case "int64":
 		switch v := value.(type) {
-		case int:
+		case mmdbtype.Int32:
 			return int64(v), nil
-		case int8:
+		case mmdbtype.Uint16:
 			return int64(v), nil
-		case int16:
+		case mmdbtype.Uint32:
 			return int64(v), nil
-		case int32:
-			return int64(v), nil
-		case int64:
-			return v, nil
-		case uint:
-			if v > 9223372036854775807 {
-				return nil, fmt.Errorf("uint value %d overflows int64", v)
-			}
-			return int64(v), nil
-		case uint8:
-			return int64(v), nil
-		case uint16:
-			return int64(v), nil
-		case uint32:
-			return int64(v), nil
-		case uint64:
+		case mmdbtype.Uint64:
 			if v > 9223372036854775807 {
 				return nil, fmt.Errorf("uint64 value %d overflows int64", v)
 			}
+			//nolint:gosec // Overflow checked above
 			return int64(v), nil
+		case *mmdbtype.Uint128:
+			i := (*big.Int)(v)
+			if !i.IsInt64() {
+				return nil, fmt.Errorf("uint128 value %s overflows int64", i.String())
+			}
+			return i.Int64(), nil
 		default:
 			return nil, fmt.Errorf("cannot convert %T to int64", value)
 		}
 
 	case "float64":
 		switch v := value.(type) {
-		case float32:
+		case mmdbtype.Float32:
 			return float64(v), nil
-		case float64:
-			return v, nil
-		case int:
+		case mmdbtype.Float64:
 			return float64(v), nil
-		case int8:
+		case mmdbtype.Int32:
 			return float64(v), nil
-		case int16:
+		case mmdbtype.Uint16:
 			return float64(v), nil
-		case int32:
+		case mmdbtype.Uint32:
 			return float64(v), nil
-		case int64:
+		case mmdbtype.Uint64:
 			return float64(v), nil
-		case uint:
-			return float64(v), nil
-		case uint8:
-			return float64(v), nil
-		case uint16:
-			return float64(v), nil
-		case uint32:
-			return float64(v), nil
-		case uint64:
-			return float64(v), nil
+		case *mmdbtype.Uint128:
+			i := (*big.Int)(v)
+			f, _ := i.Float64()
+			return f, nil
 		default:
 			return nil, fmt.Errorf("cannot convert %T to float64", value)
 		}
 
 	case "bool":
-		if v, ok := value.(bool); ok {
-			return v, nil
+		if v, ok := value.(mmdbtype.Bool); ok {
+			return bool(v), nil
 		}
 		return nil, fmt.Errorf("cannot convert %T to bool", value)
 
 	case "binary":
-		if v, ok := value.([]byte); ok {
-			return v, nil
+		if v, ok := value.(mmdbtype.Bytes); ok {
+			return []byte(v), nil
 		}
 		return nil, fmt.Errorf("cannot convert %T to binary", value)
 

@@ -4,12 +4,14 @@ package writer
 import (
 	"encoding/csv"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"io"
 	"math/big"
 	"net/netip"
 	"strconv"
 
+	"github.com/maxmind/mmdbwriter/mmdbtype"
 	"go4.org/netipx"
 
 	"github.com/maxmind/mmdbconvert/internal/config"
@@ -88,7 +90,10 @@ func (w *CSVWriter) WriteRow(prefix netip.Prefix, data map[string]any) error {
 	// Add data column values (in config order)
 	for _, col := range w.config.Columns {
 		value := data[col.Name]
-		strValue := convertToString(value)
+		strValue, err := convertToString(value)
+		if err != nil {
+			return fmt.Errorf("converting column '%s' to string: %w", col.Name, err)
+		}
 		row = append(row, strValue)
 	}
 
@@ -138,7 +143,10 @@ func (w *CSVWriter) WriteRange(start, end netip.Addr, data map[string]any) error
 
 	for _, col := range w.config.Columns {
 		value := data[col.Name]
-		strValue := convertToString(value)
+		strValue, err := convertToString(value)
+		if err != nil {
+			return fmt.Errorf("converting column '%s' to string: %w", col.Name, err)
+		}
 		row = append(row, strValue)
 	}
 
@@ -250,27 +258,48 @@ func formatIPv6AsInt(addr netip.Addr) string {
 }
 
 // convertToString converts a value to its CSV string representation.
-func convertToString(value any) string {
+// Handles mmdbtype.DataType values from the extractor.
+func convertToString(value any) (string, error) {
 	if value == nil {
-		return ""
+		return "", nil
 	}
 
+	// Handle mmdbtype.DataType values
 	switch v := value.(type) {
-	case string:
-		return v
-	case int, int8, int16, int32, int64:
-		return fmt.Sprintf("%d", v)
-	case uint, uint8, uint16, uint32, uint64:
-		return fmt.Sprintf("%d", v)
-	case float32, float64:
-		return fmt.Sprintf("%g", v)
-	case bool:
-		return strconv.FormatBool(v)
-	case []byte:
-		// Binary data - encode as hex
-		return hex.EncodeToString(v)
+	case mmdbtype.Bool:
+		return strconv.FormatBool(bool(v)), nil
+	case mmdbtype.String:
+		return string(v), nil
+	case mmdbtype.Int32:
+		return strconv.FormatInt(int64(v), 10), nil
+	case mmdbtype.Uint16:
+		return strconv.FormatUint(uint64(v), 10), nil
+	case mmdbtype.Uint32:
+		return strconv.FormatUint(uint64(v), 10), nil
+	case mmdbtype.Uint64:
+		return strconv.FormatUint(uint64(v), 10), nil
+	case *mmdbtype.Uint128:
+		return (*big.Int)(v).String(), nil
+	case mmdbtype.Float32:
+		return strconv.FormatFloat(float64(v), 'g', -1, 32), nil
+	case mmdbtype.Float64:
+		return strconv.FormatFloat(float64(v), 'g', -1, 64), nil
+	case mmdbtype.Bytes:
+		return hex.EncodeToString([]byte(v)), nil
+	case mmdbtype.Map:
+		b, err := json.Marshal(v)
+		if err != nil {
+			return "", fmt.Errorf("marshaling map to JSON: %w", err)
+		}
+		return string(b), nil
+	case mmdbtype.Slice:
+		b, err := json.Marshal(v)
+		if err != nil {
+			return "", fmt.Errorf("marshaling slice to JSON: %w", err)
+		}
+		return string(b), nil
 	default:
-		// Fallback: use fmt.Sprintf
-		return fmt.Sprintf("%v", v)
+		// Fallback for any unexpected types
+		return fmt.Sprintf("%v", v), nil
 	}
 }

@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/maxmind/mmdbwriter/mmdbtype"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -313,11 +314,11 @@ func TestCSVWriter_DataTypes(t *testing.T) {
 	prefix := netip.MustParsePrefix("10.0.0.0/24")
 
 	data := map[string]any{
-		"string_col": "hello",
-		"int_col":    int64(42),
-		"float_col":  float64(3.14),
-		"bool_col":   true,
-		"binary_col": []byte{0xde, 0xad, 0xbe, 0xef},
+		"string_col": mmdbtype.String("hello"),
+		"int_col":    mmdbtype.Uint32(42),
+		"float_col":  mmdbtype.Float64(3.14),
+		"bool_col":   mmdbtype.Bool(true),
+		"binary_col": mmdbtype.Bytes([]byte{0xde, 0xad, 0xbe, 0xef}),
 	}
 
 	err := writer.WriteRow(prefix, data)
@@ -461,20 +462,21 @@ func TestConvertToString(t *testing.T) {
 		expected string
 	}{
 		{"nil", nil, ""},
-		{"string", "hello", "hello"},
-		{"int", int(42), "42"},
-		{"int64", int64(42), "42"},
-		{"uint", uint(42), "42"},
-		{"uint64", uint64(42), "42"},
-		{"float64", float64(3.14), "3.14"},
-		{"bool true", true, "true"},
-		{"bool false", false, "false"},
-		{"binary", []byte{0xaa, 0xbb}, "aabb"},
+		{"string", mmdbtype.String("hello"), "hello"},
+		{"int32", mmdbtype.Int32(42), "42"},
+		{"uint16", mmdbtype.Uint16(42), "42"},
+		{"uint32", mmdbtype.Uint32(42), "42"},
+		{"uint64", mmdbtype.Uint64(42), "42"},
+		{"float64", mmdbtype.Float64(3.14), "3.14"},
+		{"bool true", mmdbtype.Bool(true), "true"},
+		{"bool false", mmdbtype.Bool(false), "false"},
+		{"binary", mmdbtype.Bytes([]byte{0xaa, 0xbb}), "aabb"},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := convertToString(tt.value)
+			result, err := convertToString(tt.value)
+			require.NoError(t, err)
 			assert.Equal(t, tt.expected, result)
 		})
 	}
