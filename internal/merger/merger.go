@@ -10,7 +10,6 @@ import (
 	"errors"
 	"fmt"
 	"net/netip"
-	"slices"
 	"strings"
 	"sync"
 
@@ -68,15 +67,16 @@ type columnExtractor struct {
 
 // Merger handles merging multiple MMDB databases into a single output stream.
 type Merger struct {
-	readers      *mmdb.Readers
-	config       *config.Config
-	acc          *Accumulator
-	readersList  []*mmdb.Reader    // Ordered list of readers for iteration
-	dbNamesList  []string          // Corresponding database names
-	extractors   []columnExtractor // Pre-built extractors for each column
-	unmarshalers []*mmdbtype.Unmarshaler
-	slicePool    *slicePool          // Pool for reusable data slices
-	workingSlice []mmdbtype.DataType // Reusable working slice (cleared each iteration)
+	readers       *mmdb.Readers
+	config        *config.Config
+	acc           *Accumulator
+	readersList   []*mmdb.Reader    // Ordered list of readers for iteration
+	dbNamesList   []string          // Corresponding database names
+	extractors    []columnExtractor // Pre-built extractors for each column
+	unmarshalers  []*mmdbtype.Unmarshaler
+	slicePool     *slicePool          // Pool for reusable data slices
+	workingSlice  []mmdbtype.DataType // Reusable working slice (cleared each iteration)
+	resultsBuffer []maxminddb.Result  // Pre-allocated buffer for recursion (eliminates slices.Concat allocations)
 }
 
 // NewMerger creates a new merger instance.
@@ -117,6 +117,9 @@ func NewMerger(readers *mmdb.Readers, cfg *config.Config, writer RowWriter) (*Me
 		readersList = append(readersList, reader)
 	}
 	m.readersList = readersList
+
+	// Pre-allocate results buffer for recursion (eliminates slices.Concat allocations)
+	m.resultsBuffer = make([]maxminddb.Result, len(readersList))
 
 	// Validate IP versions before building extractors
 	if err := validateIPVersions(readersList, dbNamesList); err != nil {
@@ -198,14 +201,18 @@ func (m *Merger) Merge() error {
 
 		// If there's only one database, extract and process directly
 		if len(m.readersList) == 1 {
-			if err := m.extractAndProcess([]maxminddb.Result{result}, prefix); err != nil {
+			m.resultsBuffer[0] = result // Use buffer even for single database
+			if err := m.extractAndProcess(m.resultsBuffer[:1], prefix); err != nil {
 				return err
 			}
 			continue
 		}
 
+		// PUSH first result into buffer
+		m.resultsBuffer[0] = result
+
 		// Process this network through remaining databases starting at index 1
-		if err := m.processNetwork([]maxminddb.Result{result}, prefix, 1); err != nil {
+		if err := m.processNetwork(prefix, 1); err != nil {
 			return err
 		}
 	}
@@ -219,20 +226,20 @@ func (m *Merger) Merge() error {
 }
 
 // processNetwork recursively processes a network through remaining databases.
-// It accumulates Results from each database and tracks the effective prefix.
+// It uses the pre-allocated resultsBuffer with depth tracking to avoid allocations.
 //
 // Invariants:
-// - results[i] corresponds to readersList[i] for i < dbIndex.
+// - resultsBuffer[0:dbIndex] contains Results from previous databases.
 // - effectivePrefix is the smallest network across all databases so far.
 // - With IncludeNetworksWithoutData, we always get at least one Result per database.
 func (m *Merger) processNetwork(
-	results []maxminddb.Result,
 	effectivePrefix netip.Prefix,
 	dbIndex int,
 ) error {
 	// Base case: processed all databases - extract data
 	if dbIndex >= len(m.readersList) {
-		return m.extractAndProcess(results, effectivePrefix)
+		// Pass slice view of resultsBuffer containing all accumulated results
+		return m.extractAndProcess(m.resultsBuffer[:dbIndex], effectivePrefix)
 	}
 
 	currentReader := m.readersList[dbIndex]
@@ -249,18 +256,17 @@ func (m *Merger) processNetwork(
 		// Determine smallest (most specific) network
 		smallest := network.SmallestNetwork(effectivePrefix, nextNetwork)
 
-		// CRITICAL: Always append Result from THIS database (readersList[dbIndex])
-		// This maintains results[i] ↔ readersList[i] correspondence
-		// Result may have Found() == false if database has no data (notFound offset)
-		// Use slices.Concat to guarantee new allocation and avoid shared arrays
-		newResults := slices.Concat(results, []maxminddb.Result{result})
+		// PUSH: Store result in pre-allocated buffer at current depth
+		m.resultsBuffer[dbIndex] = result
 
 		// Recurse with the smallest prefix
 		// NOTE: smallest may be smaller than result.Prefix() - that's OK!
 		// The result contains data for a broader network that covers smallest.
-		if err := m.processNetwork(newResults, smallest, dbIndex+1); err != nil {
+		if err := m.processNetwork(smallest, dbIndex+1); err != nil {
 			return err
 		}
+
+		// POP: Not needed - next iteration or return will naturally overwrite
 	}
 
 	return nil
