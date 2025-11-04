@@ -420,18 +420,23 @@ Convert MMDB databases to CSV/Parquet for loading into data warehouses:
 
 - **O(1) memory usage** - Streaming architecture processes networks on-the-fly
   (for CSV and Parquet only)
-- Typical memory: < 100 MB regardless of database size
-- Handles databases with millions of networks
+- **Peak memory: 333MB** for processing 13.8M rows (3.7GB output)
+- Memory usage independent of database size
+- Handles databases with millions of networks efficiently
 
 ### Processing Speed
 
-Typical performance on modern hardware:
+Measured performance with GeoIP2-Enterprise + Anonymous-IP databases:
 
-| Database Size | Processing Time | Output Format  |
-| ------------- | --------------- | -------------- |
-| 100K networks | 1-2 seconds     | CSV or Parquet |
-| 1M networks   | 10-15 seconds   | CSV or Parquet |
-| 5M networks   | 45-60 seconds   | CSV or Parquet |
+| Metric          | Value                                  |
+| --------------- | -------------------------------------- |
+| **Throughput**  | ~75,000 rows/second                    |
+| **Data Rate**   | ~20 MB/second CSV output               |
+| **13.8M rows**  | 3 minutes 4 seconds                    |
+| **50+ columns** | 3.7GB output (2.5GB IPv4 + 1.2GB IPv6) |
+
+**Test Environment:** 13th Gen Intel Core i7-13700K, processing Enterprise +
+Anonymous-IP with 50+ columns
 
 ### Query Performance (Parquet)
 
