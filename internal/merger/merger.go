@@ -41,7 +41,8 @@ type Merger struct {
 }
 
 // NewMerger creates a new merger instance.
-func NewMerger(readers *mmdb.Readers, cfg *config.Config, writer RowWriter) *Merger {
+// Returns an error if database readers are missing or path normalization fails.
+func NewMerger(readers *mmdb.Readers, cfg *config.Config, writer RowWriter) (*Merger, error) {
 	includeEmptyRows := false
 	if cfg.Output.IncludeEmptyRows != nil {
 		includeEmptyRows = *cfg.Output.IncludeEmptyRows
@@ -52,29 +53,22 @@ func NewMerger(readers *mmdb.Readers, cfg *config.Config, writer RowWriter) *Mer
 	for i, column := range cfg.Columns {
 		reader, ok := readers.Get(column.Database)
 		if !ok {
-			// This shouldn't happen if validation passed, but handle gracefully
-			// The error will be caught during Merge() when we try to use it
-			extractors[i] = columnExtractor{
-				reader:   nil,
-				path:     nil,
-				name:     column.Name,
-				database: column.Database,
-			}
-			continue
+			return nil, fmt.Errorf(
+				"database '%s' not found for column '%s'",
+				column.Database,
+				column.Name,
+			)
 		}
 
 		// Normalize path segments once to avoid per-row normalization allocation
 		// This converts int64 to int and validates segment types
 		pathSegments, err := mmdb.NormalizeSegments(column.Path)
 		if err != nil {
-			// This shouldn't happen if validation passed, but handle gracefully
-			extractors[i] = columnExtractor{
-				reader:   nil,
-				path:     nil,
-				name:     column.Name,
-				database: column.Database,
-			}
-			continue
+			return nil, fmt.Errorf(
+				"normalizing path for column '%s': %w",
+				column.Name,
+				err,
+			)
 		}
 
 		extractors[i] = columnExtractor{
@@ -91,7 +85,7 @@ func NewMerger(readers *mmdb.Readers, cfg *config.Config, writer RowWriter) *Mer
 		acc:         NewAccumulator(writer, includeEmptyRows),
 		extractors:  extractors,
 		unmarshaler: mmdbtype.NewUnmarshaler(),
-	}
+	}, nil
 }
 
 // Merge performs the streaming merge of all databases.

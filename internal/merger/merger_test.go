@@ -50,7 +50,8 @@ func TestMerger_SingleDatabase(t *testing.T) {
 	writer := &mockWriter{}
 
 	// Create merger and run
-	merger := NewMerger(readers, cfg, writer)
+	merger, err := NewMerger(readers, cfg, writer)
+	require.NoError(t, err)
 	err = merger.Merge()
 	require.NoError(t, err)
 
@@ -113,7 +114,8 @@ func TestMerger_MultipleDatabases(t *testing.T) {
 	writer := &mockWriter{}
 
 	// Create merger and run
-	merger := NewMerger(readers, cfg, writer)
+	merger, err := NewMerger(readers, cfg, writer)
+	require.NoError(t, err)
 	err = merger.Merge()
 	require.NoError(t, err)
 
@@ -162,7 +164,8 @@ func TestMerger_EmitsNetworksPresentOnlyInLaterDatabase(t *testing.T) {
 		stopOn:  &targetIP,
 		stopErr: errStopIteration,
 	}
-	merger := NewMerger(readers, cfg, writer)
+	merger, err := NewMerger(readers, cfg, writer)
+	require.NoError(t, err)
 
 	err = merger.Merge()
 	require.ErrorIs(t, err, errStopIteration)
@@ -200,7 +203,8 @@ func TestMerger_AdjacentNetworkMerging(t *testing.T) {
 	writer := &mockWriter{}
 
 	// Create merger and run
-	merger := NewMerger(readers, cfg, writer)
+	merger, err := NewMerger(readers, cfg, writer)
+	require.NoError(t, err)
 	err = merger.Merge()
 	require.NoError(t, err)
 
@@ -245,9 +249,8 @@ func TestMerger_MissingDatabase(t *testing.T) {
 	// Create writer
 	writer := &mockWriter{}
 
-	// Create merger and run - should error
-	merger := NewMerger(readers, cfg, writer)
-	err = merger.Merge()
+	// Create merger - should error because database doesn't exist
+	_, err = NewMerger(readers, cfg, writer)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "nonexistent")
 }
@@ -269,7 +272,8 @@ func TestMerger_MixedIPVersionsFails(t *testing.T) {
 		},
 	}
 
-	merger := NewMerger(readers, cfg, &mockWriter{})
+	merger, err := NewMerger(readers, cfg, &mockWriter{})
+	require.NoError(t, err)
 	err = merger.Merge()
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "mix IPv4-only")
@@ -291,7 +295,8 @@ func TestMerger_NoColumns(t *testing.T) {
 
 	writer := &mockWriter{}
 
-	merger := NewMerger(readers, cfg, writer)
+	merger, err := NewMerger(readers, cfg, writer)
+	require.NoError(t, err)
 	err = merger.Merge()
 	// Should error because no databases to iterate
 	assert.Error(t, err)
@@ -321,7 +326,8 @@ func TestMerger_NilValues(t *testing.T) {
 
 	writer := &mockWriter{}
 
-	merger := NewMerger(readers, cfg, writer)
+	merger, err := NewMerger(readers, cfg, writer)
+	require.NoError(t, err)
 	err = merger.Merge()
 	require.NoError(t, err)
 

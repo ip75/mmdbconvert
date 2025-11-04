@@ -57,7 +57,8 @@ func TestEndToEnd_CSVExport(t *testing.T) {
 	csvWriter := NewCSVWriter(buf, cfg)
 
 	// Create merger and run
-	m := merger.NewMerger(readers, cfg, csvWriter)
+	m, err := merger.NewMerger(readers, cfg, csvWriter)
+	require.NoError(t, err)
 	err = m.Merge()
 	require.NoError(t, err)
 
@@ -125,7 +126,8 @@ func TestEndToEnd_CSVExport_MultipleNetworkColumns(t *testing.T) {
 	buf := &bytes.Buffer{}
 	csvWriter := NewCSVWriter(buf, cfg)
 
-	m := merger.NewMerger(readers, cfg, csvWriter)
+	m, err := merger.NewMerger(readers, cfg, csvWriter)
+	require.NoError(t, err)
 	err = m.Merge()
 	require.NoError(t, err)
 
@@ -188,7 +190,8 @@ func TestEndToEnd_CSVExport_MultipleColumns(t *testing.T) {
 	buf := &bytes.Buffer{}
 	csvWriter := NewCSVWriter(buf, cfg)
 
-	m := merger.NewMerger(readers, cfg, csvWriter)
+	m, err := merger.NewMerger(readers, cfg, csvWriter)
+	require.NoError(t, err)
 	err = m.Merge()
 	require.NoError(t, err)
 
@@ -255,7 +258,8 @@ func TestEndToEnd_CSVExport_NilValues(t *testing.T) {
 	buf := &bytes.Buffer{}
 	csvWriter := NewCSVWriter(buf, cfg)
 
-	m := merger.NewMerger(readers, cfg, csvWriter)
+	m, err := merger.NewMerger(readers, cfg, csvWriter)
+	require.NoError(t, err)
 	err = m.Merge()
 	require.NoError(t, err)
 

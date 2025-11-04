@@ -178,7 +178,10 @@ func run(configPath string, quiet bool) error {
 	}
 
 	// Create merger and run
-	m := merger.NewMerger(readers, cfg, rowWriter)
+	m, err := merger.NewMerger(readers, cfg, rowWriter)
+	if err != nil {
+		return fmt.Errorf("creating merger: %w", err)
+	}
 	if err := m.Merge(); err != nil {
 		return fmt.Errorf("merging databases: %w", err)
 	}
