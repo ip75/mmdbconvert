@@ -25,6 +25,24 @@ path = ["country", "iso_code"]
 
 ## Configuration Sections
 
+### General Settings
+
+Top-level configuration options that affect overall behavior:
+
+```toml
+disable_cache = false  # Disable MMDB unmarshaler caching (default: false)
+```
+
+**Performance Options:**
+
+- `disable_cache` - Controls whether to disable MMDB unmarshaler caching. When
+  `false` (default), uses cached unmarshalers for better performance. When
+  `true`, disables the unmarshaler cache to reduce memory usage at the expense
+  of performance (several times slower). For large databases with many columns,
+  disabling cache can significantly reduce memory consumption but will make
+  processing take several times longer. Can be overridden at runtime with the
+  `--disable-cache` command-line flag.
+
 ### Output Settings
 
 The `[output]` section defines where and how data should be written.

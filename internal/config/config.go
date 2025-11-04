@@ -20,10 +20,11 @@ const (
 
 // Config represents the complete configuration file structure.
 type Config struct {
-	Output    OutputConfig  `toml:"output"`
-	Network   NetworkConfig `toml:"network"`
-	Databases []Database    `toml:"databases"`
-	Columns   []Column      `toml:"columns"`
+	Output       OutputConfig  `toml:"output"`
+	Network      NetworkConfig `toml:"network"`
+	Databases    []Database    `toml:"databases"`
+	Columns      []Column      `toml:"columns"`
+	DisableCache bool          `toml:"disable_cache"` // Disable MMDB unmarshaler caching (default: false)
 }
 
 // OutputConfig defines output file settings.
@@ -151,6 +152,8 @@ func LoadConfig(path string) (*Config, error) {
 
 // applyDefaults applies default values to configuration.
 func applyDefaults(config *Config) {
+	// DisableCache defaults to false (zero value), no action needed
+
 	// Output defaults
 	if config.Output.IncludeEmptyRows == nil {
 		config.Output.IncludeEmptyRows = boolPtr(false)

@@ -2,6 +2,9 @@
 # This configuration demonstrates merging two MaxMind databases into a single
 # CSV output with data from both sources.
 
+# Performance option: Disable unmarshaler caching (reduces memory, several times slower)
+# disable_cache = false  # Default: false (cache enabled)
+
 [output]
 format = "csv"
 file = "enterprise-anonymous-merged.csv"

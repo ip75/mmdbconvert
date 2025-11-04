@@ -105,6 +105,9 @@ mmdbconvert --config config.toml
 # Suppress progress output
 mmdbconvert --config config.toml --quiet
 
+# Disable unmarshaler caching to reduce memory usage (several times slower)
+mmdbconvert --config config.toml --disable-cache
+
 # Show version
 mmdbconvert --version
 

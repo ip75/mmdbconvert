@@ -23,12 +23,13 @@ const version = "0.1.0"
 func main() {
 	// Define command-line flags
 	var (
-		configPath string
-		quiet      bool
-		showHelp   bool
-		showVer    bool
-		cpuprofile string
-		memprofile string
+		configPath   string
+		quiet        bool
+		showHelp     bool
+		showVer      bool
+		cpuprofile   string
+		memprofile   string
+		disableCache bool
 	)
 
 	flag.StringVar(&configPath, "config", "", "Path to TOML configuration file")
@@ -37,6 +38,12 @@ func main() {
 	flag.BoolVar(&showVer, "version", false, "Show version information")
 	flag.StringVar(&cpuprofile, "cpuprofile", "", "Write CPU profile to file")
 	flag.StringVar(&memprofile, "memprofile", "", "Write memory profile to file")
+	flag.BoolVar(
+		&disableCache,
+		"disable-cache",
+		false,
+		"Disable MMDB unmarshaler caching to reduce memory usage (several times slower)",
+	)
 
 	flag.Usage = usage
 	flag.Parse()
@@ -81,7 +88,7 @@ func main() {
 	}
 
 	// Run the conversion
-	runErr := run(configPath, quiet)
+	runErr := run(configPath, quiet, disableCache)
 
 	// Stop CPU profiling and close file before potentially exiting
 	if cpuProfileFile != nil {
@@ -113,7 +120,7 @@ func main() {
 }
 
 // run performs the main conversion process.
-func run(configPath string, quiet bool) error {
+func run(configPath string, quiet, disableCache bool) error {
 	startTime := time.Now()
 
 	if !quiet {
@@ -125,6 +132,12 @@ func run(configPath string, quiet bool) error {
 	cfg, err := config.LoadConfig(configPath)
 	if err != nil {
 		return fmt.Errorf("loading config: %w", err)
+	}
+
+	// Override DisableCache from command-line flag if provided
+	// Command-line flag takes precedence over config file
+	if disableCache {
+		cfg.DisableCache = true
 	}
 
 	if !quiet {
@@ -175,6 +188,9 @@ func run(configPath string, quiet bool) error {
 
 	if !quiet {
 		fmt.Println("Merging databases and writing output...")
+		if cfg.DisableCache {
+			fmt.Println("  (unmarshaler caching disabled)")
+		}
 	}
 
 	// Create merger and run
@@ -477,6 +493,7 @@ USAGE:
 OPTIONS:
     --config <file>        Path to TOML configuration file
     --quiet                Suppress progress output
+    --disable-cache        Disable MMDB unmarshaler caching to reduce memory (several times slower)
     --cpuprofile <file>    Write CPU profile to file
     --memprofile <file>    Write memory profile to file
     --help                 Show this help message

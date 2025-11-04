@@ -3,8 +3,8 @@ module github.com/maxmind/mmdbconvert
 go 1.25.3
 
 require (
-	github.com/maxmind/mmdbwriter v1.1.0
-	github.com/oschwald/maxminddb-golang/v2 v2.0.0
+	github.com/maxmind/mmdbwriter v1.1.1-0.20251104221330-fe6950f28326
+	github.com/oschwald/maxminddb-golang/v2 v2.1.0
 	github.com/parquet-go/parquet-go v0.25.1
 	github.com/pelletier/go-toml/v2 v2.2.4
 	github.com/stretchr/testify v1.11.1

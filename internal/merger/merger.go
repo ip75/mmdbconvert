@@ -167,9 +167,15 @@ func NewMerger(readers *mmdb.Readers, cfg *config.Config, writer RowWriter) (*Me
 	m.extractors = extractors
 
 	// Create per-database unmarshaler to avoid cross-database cache contamination.
+	// When cfg.DisableCache is false (default), use NewUnmarshaler() which provides caching.
+	// When cfg.DisableCache is true, use zero-value unmarshalers which have no cache.
 	m.unmarshalers = make([]*mmdbtype.Unmarshaler, len(readersList))
 	for i := range readersList {
-		m.unmarshalers[i] = mmdbtype.NewUnmarshaler()
+		if cfg.DisableCache {
+			m.unmarshalers[i] = &mmdbtype.Unmarshaler{}
+		} else {
+			m.unmarshalers[i] = mmdbtype.NewUnmarshaler()
+		}
 	}
 
 	return m, nil
@@ -282,8 +288,11 @@ func (m *Merger) extractAndProcess(
 	for i, result := range results {
 		unmarshaler := m.unmarshalers[i]
 		if unmarshaler == nil {
-			unmarshaler = mmdbtype.NewUnmarshaler()
-			m.unmarshalers[i] = unmarshaler
+			return fmt.Errorf(
+				"unmarshaler for database %d (%s) is nil (this is a bug)",
+				i,
+				m.dbNamesList[i],
+			)
 		}
 
 		// Decode the full record (empty path means decode entire record)
