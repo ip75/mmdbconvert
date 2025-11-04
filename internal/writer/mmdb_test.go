@@ -343,8 +343,8 @@ func TestBuildNestedData_EmptyPath(t *testing.T) {
 		config: cfg,
 	}
 
-	flatData := map[string]any{
-		"enterprise_all": mmdbtype.Map{
+	flatData := mmdbtype.Map{
+		mmdbtype.String("enterprise_all"): mmdbtype.Map{
 			mmdbtype.String("country"): mmdbtype.Map{
 				mmdbtype.String("iso_code"): mmdbtype.String("US"),
 			},
@@ -462,11 +462,11 @@ func TestBuildNestedData_MapMergingAtPath(t *testing.T) {
 		config: cfg,
 	}
 
-	flatData := map[string]any{
-		"col1": mmdbtype.Map{
+	flatData := mmdbtype.Map{
+		mmdbtype.String("col1"): mmdbtype.Map{
 			mmdbtype.String("is_anonymous"): mmdbtype.Bool(true),
 		},
-		"col2": mmdbtype.Map{
+		mmdbtype.String("col2"): mmdbtype.Map{
 			mmdbtype.String("is_vpn"): mmdbtype.Bool(false),
 		},
 	}

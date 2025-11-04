@@ -197,7 +197,8 @@ func (m *Merger) processNetwork(currentNetwork netip.Prefix, dbIndex int) error 
 // extractAndProcess extracts data for all columns from all databases for the given network,
 // then feeds it to the accumulator.
 func (m *Merger) extractAndProcess(prefix netip.Prefix) error {
-	data := make(mmdbtype.Map)
+	// Pre-allocate map capacity to avoid dynamic growth
+	data := make(mmdbtype.Map, len(m.extractors))
 
 	// Extract values for all columns using cached extractors
 	for _, extractor := range m.extractors {

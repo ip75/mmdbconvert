@@ -39,9 +39,9 @@ func TestParquetWriter_SingleRow(t *testing.T) {
 	require.NoError(t, err)
 
 	prefix := netip.MustParsePrefix("10.0.0.0/24")
-	data := map[string]any{
-		"country": "US",
-		"city":    "New York",
+	data := mmdbtype.Map{
+		mmdbtype.String("country"): mmdbtype.String("US"),
+		mmdbtype.String("city"):    mmdbtype.String("New York"),
 	}
 
 	err = writer.WriteRow(prefix, data)
@@ -84,7 +84,9 @@ func TestParquetWriter_MultipleRows(t *testing.T) {
 
 	for i := range 3 {
 		prefix := netip.MustParsePrefix(fmt.Sprintf("10.0.%d.0/24", i))
-		err := writer.WriteRow(prefix, map[string]any{"value": fmt.Sprintf("row%d", i)})
+		err := writer.WriteRow(prefix, mmdbtype.Map{
+			mmdbtype.String("value"): mmdbtype.String(fmt.Sprintf("row%d", i)),
+		})
 		require.NoError(t, err)
 	}
 
@@ -125,7 +127,7 @@ func TestParquetWriter_NetworkColumns(t *testing.T) {
 	require.NoError(t, err)
 
 	prefix := netip.MustParsePrefix("192.168.1.0/24")
-	err = writer.WriteRow(prefix, map[string]any{})
+	err = writer.WriteRow(prefix, mmdbtype.Map{})
 	require.NoError(t, err)
 
 	err = writer.Flush()
@@ -167,12 +169,12 @@ func TestParquetWriter_DataTypes(t *testing.T) {
 	require.NoError(t, err)
 
 	prefix := netip.MustParsePrefix("10.0.0.0/24")
-	data := map[string]any{
-		"string_col": mmdbtype.String("hello"),
-		"int_col":    mmdbtype.Uint32(42),
-		"float_col":  mmdbtype.Float64(3.14),
-		"bool_col":   mmdbtype.Bool(true),
-		"binary_col": mmdbtype.Bytes([]byte{0xde, 0xad, 0xbe, 0xef}),
+	data := mmdbtype.Map{
+		mmdbtype.String("string_col"): mmdbtype.String("hello"),
+		mmdbtype.String("int_col"):    mmdbtype.Uint32(42),
+		mmdbtype.String("float_col"):  mmdbtype.Float64(3.14),
+		mmdbtype.String("bool_col"):   mmdbtype.Bool(true),
+		mmdbtype.String("binary_col"): mmdbtype.Bytes([]byte{0xde, 0xad, 0xbe, 0xef}),
 	}
 
 	err = writer.WriteRow(prefix, data)
@@ -215,10 +217,10 @@ func TestParquetWriter_NilValues(t *testing.T) {
 	require.NoError(t, err)
 
 	prefix := netip.MustParsePrefix("10.0.0.0/24")
-	data := map[string]any{
-		"col1": "value1",
-		"col2": nil, // nil value
-		"col3": "value3",
+	data := mmdbtype.Map{
+		mmdbtype.String("col1"): mmdbtype.String("value1"),
+		mmdbtype.String("col2"): nil, // nil value
+		mmdbtype.String("col3"): mmdbtype.String("value3"),
 	}
 
 	err = writer.WriteRow(prefix, data)
@@ -257,7 +259,7 @@ func TestParquetWriter_IPv6StartInt(t *testing.T) {
 	require.NoError(t, err)
 
 	prefix := netip.MustParsePrefix("2001:db8::/126")
-	require.NoError(t, writer.WriteRow(prefix, map[string]any{}))
+	require.NoError(t, writer.WriteRow(prefix, mmdbtype.Map{}))
 	require.NoError(t, writer.Flush())
 
 	pf, err := parquet.OpenFile(bytes.NewReader(buf.Bytes()), int64(buf.Len()))
@@ -303,7 +305,9 @@ func TestParquetWriter_Compression(t *testing.T) {
 			require.NoError(t, err)
 
 			prefix := netip.MustParsePrefix("10.0.0.0/24")
-			err = writer.WriteRow(prefix, map[string]any{"value": "test"})
+			err = writer.WriteRow(prefix, mmdbtype.Map{
+				mmdbtype.String("value"): mmdbtype.String("test"),
+			})
 			require.NoError(t, err)
 
 			err = writer.Flush()
@@ -343,7 +347,9 @@ func TestParquetWriter_RowGroupSize(t *testing.T) {
 	// Write 5 rows (should create multiple row groups)
 	for i := range 5 {
 		prefix := netip.MustParsePrefix(fmt.Sprintf("10.0.%d.0/24", i))
-		err := writer.WriteRow(prefix, map[string]any{"value": fmt.Sprintf("row%d", i)})
+		err := writer.WriteRow(prefix, mmdbtype.Map{
+			mmdbtype.String("value"): mmdbtype.String(fmt.Sprintf("row%d", i)),
+		})
 		require.NoError(t, err)
 	}
 

@@ -103,12 +103,6 @@ func (w *MMDBWriter) buildNestedData(flatData mmdbtype.Map) (mmdbtype.Map, error
 			continue
 		}
 
-		// Value should already be mmdbtype.DataType - use as-is!
-		dt, ok := value.(mmdbtype.DataType)
-		if !ok {
-			return nil, fmt.Errorf("column %s: expected mmdbtype.DataType, got %T", col.Name, value)
-		}
-
 		// Use output_path if set, otherwise use [name] for flat structure
 		path := col.OutputPath
 		if path == nil {
@@ -116,7 +110,7 @@ func (w *MMDBWriter) buildNestedData(flatData mmdbtype.Map) (mmdbtype.Map, error
 		}
 
 		var err error
-		root, err = mergeNestedValue(root, path.Segments(), dt)
+		root, err = mergeNestedValue(root, path.Segments(), value)
 		if err != nil {
 			return nil, fmt.Errorf("setting column %s: %w", col.Name, err)
 		}

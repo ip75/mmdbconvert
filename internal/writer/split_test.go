@@ -5,17 +5,18 @@ import (
 	"net/netip"
 	"testing"
 
+	"github.com/maxmind/mmdbwriter/mmdbtype"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 type recordWriter struct {
 	rows   []netip.Prefix
-	data   []map[string]any
+	data   []mmdbtype.Map
 	flushE error
 }
 
-func (r *recordWriter) WriteRow(prefix netip.Prefix, data map[string]any) error {
+func (r *recordWriter) WriteRow(prefix netip.Prefix, data mmdbtype.Map) error {
 	r.rows = append(r.rows, prefix)
 	r.data = append(r.data, data)
 	return nil
@@ -29,13 +30,13 @@ func (r *recordWriter) Flush() error {
 type rangeRecordWriter struct {
 	rows        []netip.Prefix
 	ranges      [][2]netip.Addr // Track ranges separately
-	data        []map[string]any
-	rangeData   []map[string]any
+	data        []mmdbtype.Map
+	rangeData   []mmdbtype.Map
 	writeRowE   error
 	writeRangeE error
 }
 
-func (r *rangeRecordWriter) WriteRow(prefix netip.Prefix, data map[string]any) error {
+func (r *rangeRecordWriter) WriteRow(prefix netip.Prefix, data mmdbtype.Map) error {
 	if r.writeRowE != nil {
 		return r.writeRowE
 	}
@@ -44,7 +45,7 @@ func (r *rangeRecordWriter) WriteRow(prefix netip.Prefix, data map[string]any) e
 	return nil
 }
 
-func (r *rangeRecordWriter) WriteRange(start, end netip.Addr, data map[string]any) error {
+func (r *rangeRecordWriter) WriteRange(start, end netip.Addr, data mmdbtype.Map) error {
 	if r.writeRangeE != nil {
 		return r.writeRangeE
 	}
@@ -62,8 +63,12 @@ func TestSplitRowWriter_RoutesByIPVersion(t *testing.T) {
 	v4Prefix := netip.MustParsePrefix("10.0.0.0/24")
 	v6Prefix := netip.MustParsePrefix("2001:db8::/32")
 
-	require.NoError(t, split.WriteRow(v4Prefix, map[string]any{"col": "ipv4"}))
-	require.NoError(t, split.WriteRow(v6Prefix, map[string]any{"col": "ipv6"}))
+	require.NoError(t, split.WriteRow(v4Prefix, mmdbtype.Map{
+		mmdbtype.String("col"): mmdbtype.String("ipv4"),
+	}))
+	require.NoError(t, split.WriteRow(v6Prefix, mmdbtype.Map{
+		mmdbtype.String("col"): mmdbtype.String("ipv6"),
+	}))
 
 	require.Len(t, v4.rows, 1)
 	assert.Equal(t, v4Prefix, v4.rows[0])
@@ -105,7 +110,9 @@ func TestSplitRowWriter_WriteRangeRoutesToRangeCapableWriter(t *testing.T) {
 	// Test IPv4 range routing
 	v4Start := netip.MustParseAddr("10.0.0.0")
 	v4End := netip.MustParseAddr("10.0.0.255")
-	v4Data := map[string]any{"col": "ipv4_range"}
+	v4Data := mmdbtype.Map{
+		mmdbtype.String("col"): mmdbtype.String("ipv4_range"),
+	}
 
 	require.NoError(t, split.WriteRange(v4Start, v4End, v4Data))
 
@@ -119,7 +126,9 @@ func TestSplitRowWriter_WriteRangeRoutesToRangeCapableWriter(t *testing.T) {
 	// Test IPv6 range routing
 	v6Start := netip.MustParseAddr("2001:db8::1")
 	v6End := netip.MustParseAddr("2001:db8::ffff")
-	v6Data := map[string]any{"col": "ipv6_range"}
+	v6Data := mmdbtype.Map{
+		mmdbtype.String("col"): mmdbtype.String("ipv6_range"),
+	}
 
 	require.NoError(t, split.WriteRange(v6Start, v6End, v6Data))
 
@@ -141,7 +150,9 @@ func TestSplitRowWriter_WriteRangeFallsBackToCIDRs(t *testing.T) {
 	// Test IPv4 fallback
 	v4Start := netip.MustParseAddr("10.0.0.0")
 	v4End := netip.MustParseAddr("10.0.0.255")
-	v4Data := map[string]any{"col": "ipv4_fallback"}
+	v4Data := mmdbtype.Map{
+		mmdbtype.String("col"): mmdbtype.String("ipv4_fallback"),
+	}
 
 	require.NoError(t, split.WriteRange(v4Start, v4End, v4Data))
 
@@ -155,7 +166,9 @@ func TestSplitRowWriter_WriteRangeFallsBackToCIDRs(t *testing.T) {
 	// Test IPv6 fallback
 	v6Start := netip.MustParseAddr("2001:db8::")
 	v6End := netip.MustParseAddr("2001:db8::ffff")
-	v6Data := map[string]any{"col": "ipv6_fallback"}
+	v6Data := mmdbtype.Map{
+		mmdbtype.String("col"): mmdbtype.String("ipv6_fallback"),
+	}
 
 	require.NoError(t, split.WriteRange(v6Start, v6End, v6Data))
 
@@ -175,7 +188,9 @@ func TestSplitRowWriter_WriteRangeFallbackMultipleCIDRs(t *testing.T) {
 	// 10.0.0.1-10.0.0.254 requires multiple CIDRs
 	start := netip.MustParseAddr("10.0.0.1")
 	end := netip.MustParseAddr("10.0.0.254")
-	data := map[string]any{"col": "multi_cidr"}
+	data := mmdbtype.Map{
+		mmdbtype.String("col"): mmdbtype.String("multi_cidr"),
+	}
 
 	require.NoError(t, split.WriteRange(start, end, data))
 
@@ -243,7 +258,7 @@ type errorRecordWriter struct {
 	err error
 }
 
-func (e *errorRecordWriter) WriteRow(netip.Prefix, map[string]any) error {
+func (e *errorRecordWriter) WriteRow(netip.Prefix, mmdbtype.Map) error {
 	return e.err
 }
 
@@ -257,7 +272,7 @@ func TestSplitRowWriter_ImplementsRangeRowWriter(t *testing.T) {
 	// Verify that SplitRowWriter satisfies the RangeRowWriter interface
 	// This is the same check that merger.Accumulator.Flush() performs
 	type rangeRowWriter interface {
-		WriteRange(netip.Addr, netip.Addr, map[string]any) error
+		WriteRange(netip.Addr, netip.Addr, mmdbtype.Map) error
 	}
 
 	// This type assertion must succeed for the feature to work
@@ -267,7 +282,9 @@ func TestSplitRowWriter_ImplementsRangeRowWriter(t *testing.T) {
 	// Verify it actually calls WriteRange on the underlying writer
 	start := netip.MustParseAddr("10.0.0.0")
 	end := netip.MustParseAddr("10.0.0.255")
-	data := map[string]any{"test": "data"}
+	data := mmdbtype.Map{
+		mmdbtype.String("test"): mmdbtype.String("data"),
+	}
 
 	require.NoError(t, split.WriteRange(start, end, data))
 
@@ -289,7 +306,7 @@ func TestSplitRowWriter_RangeCompressionWithAccumulator(t *testing.T) {
 
 	// Simulate what merger.Accumulator does: check for RangeRowWriter
 	type rangeRowWriter interface {
-		WriteRange(netip.Addr, netip.Addr, map[string]any) error
+		WriteRange(netip.Addr, netip.Addr, mmdbtype.Map) error
 	}
 
 	// When Accumulator.Flush() runs, it does this check:
@@ -297,7 +314,9 @@ func TestSplitRowWriter_RangeCompressionWithAccumulator(t *testing.T) {
 		// It should call WriteRange with a range of adjacent networks
 		start := netip.MustParseAddr("10.0.0.0")
 		end := netip.MustParseAddr("10.0.3.255") // Covers 4 /24s
-		data := map[string]any{"country": "US"}
+		data := mmdbtype.Map{
+			mmdbtype.String("country"): mmdbtype.String("US"),
+		}
 
 		require.NoError(t, rangeWriter.WriteRange(start, end, data))
 

@@ -36,6 +36,8 @@ type CSVWriter struct {
 	headerEnabled bool
 	rangeCapable  bool
 	bigIntPool    *sync.Pool // Pool of big.Int for IPv6 integer conversion
+	rowBatch      [][]string // Batch buffer for rows
+	batchSize     int        // Number of rows to batch before writing
 }
 
 // NewCSVWriter creates a new CSV writer.
@@ -62,6 +64,7 @@ func NewCSVWriter(w io.Writer, cfg *config.Config) *CSVWriter {
 		}
 	}
 
+	const defaultBatchSize = 1000
 	return &CSVWriter{
 		writer:        csvWriter,
 		config:        cfg,
@@ -73,6 +76,8 @@ func NewCSVWriter(w io.Writer, cfg *config.Config) *CSVWriter {
 				return new(big.Int)
 			},
 		},
+		rowBatch:  make([][]string, 0, defaultBatchSize),
+		batchSize: defaultBatchSize,
 	}
 }
 
@@ -104,16 +109,35 @@ func (w *CSVWriter) WriteRow(prefix netip.Prefix, data mmdbtype.Map) error {
 		row = append(row, strValue)
 	}
 
-	// Write the row
-	if err := w.writer.Write(row); err != nil {
-		return fmt.Errorf("writing CSV row: %w", err)
+	// Add row to batch
+	w.rowBatch = append(w.rowBatch, row)
+
+	// Flush batch if it's full
+	if len(w.rowBatch) >= w.batchSize {
+		return w.flushBatch()
 	}
 
 	return nil
 }
 
+// flushBatch writes all batched rows to the CSV writer.
+func (w *CSVWriter) flushBatch() error {
+	for _, row := range w.rowBatch {
+		if err := w.writer.Write(row); err != nil {
+			return fmt.Errorf("writing CSV row: %w", err)
+		}
+	}
+	// Clear the batch
+	w.rowBatch = w.rowBatch[:0]
+	return nil
+}
+
 // Flush ensures all buffered data is written.
 func (w *CSVWriter) Flush() error {
+	// Flush any remaining batched rows
+	if err := w.flushBatch(); err != nil {
+		return err
+	}
 	w.writer.Flush()
 	if err := w.writer.Error(); err != nil {
 		return fmt.Errorf("CSV flush error: %w", err)
@@ -157,8 +181,12 @@ func (w *CSVWriter) WriteRange(start, end netip.Addr, data mmdbtype.Map) error {
 		row = append(row, strValue)
 	}
 
-	if err := w.writer.Write(row); err != nil {
-		return fmt.Errorf("writing CSV row: %w", err)
+	// Add row to batch
+	w.rowBatch = append(w.rowBatch, row)
+
+	// Flush batch if it's full
+	if len(w.rowBatch) >= w.batchSize {
+		return w.flushBatch()
 	}
 
 	return nil

@@ -36,9 +36,9 @@ func TestCSVWriter_SingleRow(t *testing.T) {
 	writer := NewCSVWriter(buf, cfg)
 
 	prefix := netip.MustParsePrefix("10.0.0.0/24")
-	data := map[string]any{
-		"country": "US",
-		"city":    "New York",
+	data := mmdbtype.Map{
+		mmdbtype.String("country"): mmdbtype.String("US"),
+		mmdbtype.String("city"):    mmdbtype.String("New York"),
 	}
 
 	err := writer.WriteRow(prefix, data)
@@ -82,7 +82,9 @@ func TestCSVWriter_MultipleRows(t *testing.T) {
 	}
 
 	for _, row := range rows {
-		err := writer.WriteRow(row.prefix, map[string]any{"value": row.value})
+		err := writer.WriteRow(row.prefix, mmdbtype.Map{
+			mmdbtype.String("value"): mmdbtype.String(row.value),
+		})
 		require.NoError(t, err)
 	}
 
@@ -173,7 +175,7 @@ func TestCSVWriter_NetworkColumns(t *testing.T) {
 			writer := NewCSVWriter(buf, cfg)
 			prefix := netip.MustParsePrefix(tt.prefix)
 
-			err := writer.WriteRow(prefix, map[string]any{})
+			err := writer.WriteRow(prefix, mmdbtype.Map{})
 			require.NoError(t, err)
 
 			err = writer.Flush()
@@ -212,7 +214,9 @@ func TestCSVWriter_WriteRange(t *testing.T) {
 	start := netip.MustParseAddr("1.0.1.0")
 	end := netip.MustParseAddr("1.0.3.255")
 
-	err := writer.WriteRange(start, end, map[string]any{"country": "CN"})
+	err := writer.WriteRange(start, end, mmdbtype.Map{
+		mmdbtype.String("country"): mmdbtype.String("CN"),
+	})
 	require.NoError(t, err)
 	require.NoError(t, writer.Flush())
 
@@ -242,7 +246,7 @@ func TestCSVWriter_IPv6(t *testing.T) {
 	writer := NewCSVWriter(buf, cfg)
 	prefix := netip.MustParsePrefix("2001:db8::/32")
 
-	err := writer.WriteRow(prefix, map[string]any{})
+	err := writer.WriteRow(prefix, mmdbtype.Map{})
 	require.NoError(t, err)
 
 	err = writer.Flush()
@@ -280,7 +284,9 @@ func TestCSVWriter_DisableHeader(t *testing.T) {
 		t,
 		writer.WriteRow(
 			netip.MustParsePrefix("10.0.0.0/24"),
-			map[string]any{"value": "row"},
+			mmdbtype.Map{
+				mmdbtype.String("value"): mmdbtype.String("row"),
+			},
 		),
 	)
 	require.NoError(t, writer.Flush())
@@ -313,12 +319,12 @@ func TestCSVWriter_DataTypes(t *testing.T) {
 	writer := NewCSVWriter(buf, cfg)
 	prefix := netip.MustParsePrefix("10.0.0.0/24")
 
-	data := map[string]any{
-		"string_col": mmdbtype.String("hello"),
-		"int_col":    mmdbtype.Uint32(42),
-		"float_col":  mmdbtype.Float64(3.14),
-		"bool_col":   mmdbtype.Bool(true),
-		"binary_col": mmdbtype.Bytes([]byte{0xde, 0xad, 0xbe, 0xef}),
+	data := mmdbtype.Map{
+		mmdbtype.String("string_col"): mmdbtype.String("hello"),
+		mmdbtype.String("int_col"):    mmdbtype.Uint32(42),
+		mmdbtype.String("float_col"):  mmdbtype.Float64(3.14),
+		mmdbtype.String("bool_col"):   mmdbtype.Bool(true),
+		mmdbtype.String("binary_col"): mmdbtype.Bytes([]byte{0xde, 0xad, 0xbe, 0xef}),
 	}
 
 	err := writer.WriteRow(prefix, data)
@@ -361,10 +367,10 @@ func TestCSVWriter_NilValues(t *testing.T) {
 	writer := NewCSVWriter(buf, cfg)
 	prefix := netip.MustParsePrefix("10.0.0.0/24")
 
-	data := map[string]any{
-		"col1": "value1",
-		"col2": nil, // nil value
-		"col3": "value3",
+	data := mmdbtype.Map{
+		mmdbtype.String("col1"): mmdbtype.String("value1"),
+		mmdbtype.String("col2"): nil, // nil value
+		mmdbtype.String("col3"): mmdbtype.String("value3"),
 	}
 
 	err := writer.WriteRow(prefix, data)
@@ -403,9 +409,9 @@ func TestCSVWriter_CustomDelimiter(t *testing.T) {
 	writer := NewCSVWriter(buf, cfg)
 	prefix := netip.MustParsePrefix("10.0.0.0/24")
 
-	data := map[string]any{
-		"a": "foo",
-		"b": "bar",
+	data := mmdbtype.Map{
+		mmdbtype.String("a"): mmdbtype.String("foo"),
+		mmdbtype.String("b"): mmdbtype.String("bar"),
 	}
 
 	err := writer.WriteRow(prefix, data)
@@ -440,8 +446,8 @@ func TestCSVWriter_CSVEscaping(t *testing.T) {
 	prefix := netip.MustParsePrefix("10.0.0.0/24")
 
 	// Test value with comma (requires quoting)
-	data := map[string]any{
-		"value": "hello, world",
+	data := mmdbtype.Map{
+		mmdbtype.String("value"): mmdbtype.String("hello, world"),
 	}
 
 	err := writer.WriteRow(prefix, data)
