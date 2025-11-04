@@ -430,9 +430,9 @@ Measured performance with GeoIP2-Enterprise + Anonymous-IP databases:
 
 | Metric          | Value                                  |
 | --------------- | -------------------------------------- |
-| **Throughput**  | ~75,000 rows/second                    |
-| **Data Rate**   | ~20 MB/second CSV output               |
-| **13.8M rows**  | 3 minutes 4 seconds                    |
+| **Throughput**  | ~120,000 rows/second                   |
+| **Data Rate**   | ~32 MB/second CSV output               |
+| **13.8M rows**  | 1 minute 58 seconds                    |
 | **50+ columns** | 3.7GB output (2.5GB IPv4 + 1.2GB IPv6) |
 
 **Test Environment:** 13th Gen Intel Core i7-13700K, processing Enterprise +

@@ -33,13 +33,13 @@ type columnExtractor struct {
 
 // Merger handles merging multiple MMDB databases into a single output stream.
 type Merger struct {
-	readers     *mmdb.Readers
-	config      *config.Config
-	acc         *Accumulator
-	readersList []*mmdb.Reader    // Ordered list of readers for iteration
-	dbNamesList []string          // Corresponding database names
-	extractors  []columnExtractor // Pre-built extractors for each column
-	unmarshaler *mmdbtype.Unmarshaler
+	readers      *mmdb.Readers
+	config       *config.Config
+	acc          *Accumulator
+	readersList  []*mmdb.Reader    // Ordered list of readers for iteration
+	dbNamesList  []string          // Corresponding database names
+	extractors   []columnExtractor // Pre-built extractors for each column
+	unmarshalers []*mmdbtype.Unmarshaler
 }
 
 // NewMerger creates a new merger instance.
@@ -52,10 +52,9 @@ func NewMerger(readers *mmdb.Readers, cfg *config.Config, writer RowWriter) (*Me
 
 	// Create Merger instance early so we can call methods on it
 	m := &Merger{
-		readers:     readers,
-		config:      cfg,
-		acc:         NewAccumulator(writer, includeEmptyRows),
-		unmarshaler: mmdbtype.NewUnmarshaler(),
+		readers: readers,
+		config:  cfg,
+		acc:     NewAccumulator(writer, includeEmptyRows),
 	}
 
 	// Build ordered list of unique database names
@@ -123,6 +122,12 @@ func NewMerger(readers *mmdb.Readers, cfg *config.Config, writer RowWriter) (*Me
 		}
 	}
 	m.extractors = extractors
+
+	// Create per-database unmarshaler to avoid cross-database cache contamination.
+	m.unmarshalers = make([]*mmdbtype.Unmarshaler, len(readersList))
+	for i := range readersList {
+		m.unmarshalers[i] = mmdbtype.NewUnmarshaler()
+	}
 
 	return m, nil
 }
@@ -215,6 +220,10 @@ func (m *Merger) processNetwork(
 // extractAndProcess extracts data for all columns using precomputed Results,
 // then feeds the result to the accumulator.
 //
+// Key optimization: Decode each database's full record once, then extract all
+// columns from the cached record. This reduces decoder allocations from
+// O(columns) to O(databases) per network.
+//
 // This function performs NO database lookups - all Results come from the slice.
 // Invariants:
 // - results[i] corresponds to readersList[i].
@@ -223,10 +232,35 @@ func (m *Merger) extractAndProcess(
 	results []maxminddb.Result,
 	effectivePrefix netip.Prefix,
 ) error {
-	// Pre-allocate map capacity to avoid dynamic growth
+	// Step 1: Decode full records once per database
+	// This replaces N decoder invocations (one per column) with M invocations (one per database)
+	// For typical configs: N=50+, M=1-3, so this is a ~16-50x reduction in decoder calls
+	decodedRecords := make([]mmdbtype.Map, len(results))
+	for i, result := range results {
+		unmarshaler := m.unmarshalers[i]
+		if unmarshaler == nil {
+			unmarshaler = mmdbtype.NewUnmarshaler()
+			m.unmarshalers[i] = unmarshaler
+		}
+
+		// Decode the full record (empty path means decode entire record)
+		if err := result.Decode(unmarshaler); err != nil {
+			return fmt.Errorf("decoding database %d (%s): %w", i, m.dbNamesList[i], err)
+		}
+
+		// Get the decoded value and type-assert to Map
+		value := unmarshaler.Result()
+		unmarshaler.Clear()
+
+		if record, ok := value.(mmdbtype.Map); ok {
+			decodedRecords[i] = record
+		}
+		// If not a Map, leave decodedRecords[i] as nil (no data for this database)
+	}
+
+	// Step 2: Extract column values from cached records
 	data := make(mmdbtype.Map, len(m.extractors))
 
-	// Extract values for all columns using Results
 	for _, extractor := range m.extractors {
 		// Check if reader was resolved during initialization
 		if extractor.reader == nil {
@@ -237,30 +271,26 @@ func (m *Merger) extractAndProcess(
 			)
 		}
 
-		// Get Result for this database using cached index
-		if extractor.dbIndex < 0 || extractor.dbIndex >= len(results) {
+		// Get cached decoded record for this database
+		if extractor.dbIndex < 0 || extractor.dbIndex >= len(decodedRecords) {
 			// Database index out of bounds - skip column
 			continue
 		}
 
-		result := results[extractor.dbIndex]
+		record := decodedRecords[extractor.dbIndex]
+		if record == nil {
+			continue // No data in this database for this network
+		}
 
-		// Extract directly from Result - NO LOOKUP!
-		// DecodePath handles notFound Results internally (checks Found(), returns early)
-		//
-		// IMPORTANT: effectivePrefix may be smaller than result.Prefix()
-		// This is valid - the result contains data for a broader network,
-		// and DecodePath correctly handles querying within that network.
-		if err := result.DecodePath(m.unmarshaler, extractor.path...); err != nil {
+		// Walk the path in the cached record to extract the value
+		value, err := walkPath(record, extractor.path)
+		if err != nil {
 			return fmt.Errorf(
 				"decoding path for column '%s': %w",
 				extractor.name,
 				err,
 			)
 		}
-
-		value := m.unmarshaler.Result()
-		m.unmarshaler.Clear()
 
 		// Only add non-nil values to reduce allocations and simplify empty detection
 		if value != nil {
@@ -270,6 +300,92 @@ func (m *Merger) extractAndProcess(
 
 	// Use the effectivePrefix parameter - NOT derived from results!
 	return m.acc.Process(effectivePrefix, data)
+}
+
+// walkPath navigates through a nested mmdbtype.Map/Slice structure using the given path.
+// Returns nil if the path doesn't exist.
+func walkPath(root mmdbtype.Map, path []any) (mmdbtype.DataType, error) {
+	if len(path) == 0 {
+		// Empty path means return the entire record
+		return root, nil
+	}
+
+	var current mmdbtype.DataType = root
+
+	for i, segment := range path {
+		switch key := segment.(type) {
+		case string:
+			// Navigate through a map
+			m, ok := current.(mmdbtype.Map)
+			if !ok {
+				return nil, fmt.Errorf(
+					"navigating path %s segment %q: expected map but found %T",
+					describeWalkPath(path[:i]),
+					key,
+					current,
+				)
+			}
+			val, exists := m[mmdbtype.String(key)]
+			if !exists {
+				return nil, nil
+			}
+			current = val
+
+		case int:
+			// Navigate through a slice
+			s, ok := current.(mmdbtype.Slice)
+			if !ok {
+				return nil, fmt.Errorf(
+					"navigating path %s segment %d: expected slice but found %T",
+					describeWalkPath(path[:i]),
+					key,
+					current,
+				)
+			}
+			idx := key
+			if idx < 0 {
+				idx = len(s) + idx
+			}
+			if idx < 0 || idx >= len(s) {
+				return nil, nil
+			}
+			current = s[idx]
+
+		default:
+			// Invalid path segment type
+			return nil, fmt.Errorf(
+				"navigating path %s: unsupported segment type %T",
+				describeWalkPath(path[:i]),
+				segment,
+			)
+		}
+	}
+
+	return current, nil
+}
+
+func describeWalkPath(path []any) string {
+	if len(path) == 0 {
+		return "[]"
+	}
+
+	var b strings.Builder
+	b.WriteByte('[')
+	for i, seg := range path {
+		if i > 0 {
+			b.WriteByte(' ')
+		}
+		switch v := seg.(type) {
+		case string:
+			b.WriteString(v)
+		case int:
+			fmt.Fprintf(&b, "%d", v)
+		default:
+			fmt.Fprintf(&b, "%v", v)
+		}
+	}
+	b.WriteByte(']')
+	return b.String()
 }
 
 // getUniqueDatabaseNames returns the list of unique database names used in columns.

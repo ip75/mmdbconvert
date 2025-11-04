@@ -663,3 +663,94 @@ func TestMerger_IncludeNetworksWithoutDataGuarantees(t *testing.T) {
 	assert.GreaterOrEqual(t, count, 1,
 		"NetworksWithin should yield at least one Result even without data")
 }
+
+func TestWalkPathSupportsNegativeIndex(t *testing.T) {
+	root := mmdbtype.Map{
+		"values": mmdbtype.Slice{
+			mmdbtype.String("first"),
+			mmdbtype.String("second"),
+		},
+	}
+
+	value, err := walkPath(root, []any{"values", -1})
+	require.NoError(t, err)
+	require.Equal(t, mmdbtype.String("second"), value)
+}
+
+func TestWalkPathReturnsErrorOnTypeMismatch(t *testing.T) {
+	root := mmdbtype.Map{
+		"leaf": mmdbtype.String("value"),
+	}
+
+	_, err := walkPath(root, []any{"leaf", "nested"})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "leaf")
+}
+
+func TestDecodeOnceMatchesDecodePath(t *testing.T) {
+	reader, err := mmdb.Open(testDataDir + "/GeoIP2-Enterprise-Test.mmdb")
+	require.NoError(t, err)
+	defer reader.Close()
+
+	paths := []struct {
+		name string
+		path []any
+	}{
+		{name: "country", path: []any{"country", "iso_code"}},
+		{name: "continent", path: []any{"continent", "code"}},
+		{name: "latitude", path: []any{"location", "latitude"}},
+		{name: "longitude", path: []any{"location", "longitude"}},
+	}
+
+	fullUnmarshaler := mmdbtype.NewUnmarshaler()
+	pathUnmarshaler := mmdbtype.NewUnmarshaler()
+
+	count := 0
+	for result := range reader.Networks() {
+		require.NoError(t, result.Err())
+
+		if !result.Found() {
+			continue
+		}
+
+		require.NoError(t, result.Decode(fullUnmarshaler))
+		fullValue := fullUnmarshaler.Result()
+		fullUnmarshaler.Clear()
+
+		record, ok := fullValue.(mmdbtype.Map)
+		require.True(t, ok, "expected full record to be mmdbtype.Map for %s", result.Prefix())
+
+		for _, p := range paths {
+			got, err := walkPath(record, p.path)
+			require.NoError(t, err)
+
+			require.NoError(t, result.DecodePath(pathUnmarshaler, p.path...))
+			expected := pathUnmarshaler.Result()
+			pathUnmarshaler.Clear()
+
+			if expected == nil {
+				assert.Nil(t, got, "expected nil for %s at %s", p.name, result.Prefix())
+				continue
+			}
+
+			require.NotNil(t, got, "walkPath returned nil for %s at %s", p.name, result.Prefix())
+			assert.Truef(t, mmdbEqual(expected, got),
+				"walkPath mismatch for %s at %s", p.name, result.Prefix())
+		}
+
+		count++
+		if count >= 50 {
+			break
+		}
+	}
+}
+
+func mmdbEqual(a, b mmdbtype.DataType) bool {
+	if a == nil && b == nil {
+		return true
+	}
+	if a == nil || b == nil {
+		return false
+	}
+	return a.Equal(b)
+}
