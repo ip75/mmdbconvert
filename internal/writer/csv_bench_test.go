@@ -37,11 +37,12 @@ func BenchmarkCSVWriteRow(b *testing.B) {
 
 	prefix := netip.MustParsePrefix("1.0.0.0/24")
 
-	data := mmdbtype.Map{
-		"country":   mmdbtype.String("US"),
-		"city":      mmdbtype.String("New York"),
-		"latitude":  mmdbtype.Float64(40.7128),
-		"longitude": mmdbtype.Float64(-74.0060),
+	// Data in column order: country, city, latitude, longitude
+	data := []mmdbtype.DataType{
+		mmdbtype.String("US"),
+		mmdbtype.String("New York"),
+		mmdbtype.Float64(40.7128),
+		mmdbtype.Float64(-74.0060),
 	}
 
 	b.ResetTimer()

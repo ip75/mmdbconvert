@@ -1,7 +1,6 @@
 package merger
 
 import (
-	"maps"
 	"net/netip"
 	"testing"
 
@@ -23,17 +22,17 @@ type mockRangeWriter struct {
 	ranges []struct {
 		start netip.Addr
 		end   netip.Addr
-		data  mmdbtype.Map
+		data  []mmdbtype.DataType
 	}
 	writeErr error
 }
 
 type mockRow struct {
 	prefix netip.Prefix
-	data   mmdbtype.Map
+	data   []mmdbtype.DataType
 }
 
-func (m *mockWriter) WriteRow(prefix netip.Prefix, data mmdbtype.Map) error {
+func (m *mockWriter) WriteRow(prefix netip.Prefix, data []mmdbtype.DataType) error {
 	if m.stopOn != nil && prefix.Contains(*m.stopOn) {
 		m.found = true
 		if m.stopErr != nil {
@@ -41,36 +40,41 @@ func (m *mockWriter) WriteRow(prefix netip.Prefix, data mmdbtype.Map) error {
 		}
 	}
 	// Deep copy data to avoid mutation issues
-	dataCopy := maps.Clone(data)
+	dataCopy := make([]mmdbtype.DataType, len(data))
+	copy(dataCopy, data)
 	m.rows = append(m.rows, mockRow{prefix: prefix, data: dataCopy})
 	return nil
 }
 
-func (m *mockRangeWriter) WriteRow(prefix netip.Prefix, data mmdbtype.Map) error {
-	m.rows = append(m.rows, mockRow{prefix: prefix, data: maps.Clone(data)})
+func (m *mockRangeWriter) WriteRow(prefix netip.Prefix, data []mmdbtype.DataType) error {
+	dataCopy := make([]mmdbtype.DataType, len(data))
+	copy(dataCopy, data)
+	m.rows = append(m.rows, mockRow{prefix: prefix, data: dataCopy})
 	return nil
 }
 
-func (m *mockRangeWriter) WriteRange(start, end netip.Addr, data mmdbtype.Map) error {
+func (m *mockRangeWriter) WriteRange(start, end netip.Addr, data []mmdbtype.DataType) error {
+	dataCopy := make([]mmdbtype.DataType, len(data))
+	copy(dataCopy, data)
 	m.ranges = append(m.ranges, struct {
 		start netip.Addr
 		end   netip.Addr
-		data  mmdbtype.Map
+		data  []mmdbtype.DataType
 	}{
 		start: start,
 		end:   end,
-		data:  maps.Clone(data),
+		data:  dataCopy,
 	})
 	return m.writeErr
 }
 
 func TestAccumulator_SingleNetwork(t *testing.T) {
 	writer := &mockWriter{}
-	acc := NewAccumulator(writer, true)
+	acc := NewAccumulator(writer, true, newSlicePool(1))
 
 	// Process single network
 	prefix := netip.MustParsePrefix("10.0.0.0/24")
-	data := mmdbtype.Map{mmdbtype.String("country"): mmdbtype.String("US")}
+	data := []mmdbtype.DataType{mmdbtype.String("US")}
 
 	err := acc.Process(prefix, data)
 	require.NoError(t, err)
@@ -87,10 +91,10 @@ func TestAccumulator_SingleNetwork(t *testing.T) {
 
 func TestAccumulator_AdjacentNetworksWithSameData(t *testing.T) {
 	writer := &mockWriter{}
-	acc := NewAccumulator(writer, true)
+	acc := NewAccumulator(writer, true, newSlicePool(1))
 
 	// Process two adjacent /25 networks with same data
-	data := mmdbtype.Map{mmdbtype.String("country"): mmdbtype.String("US")}
+	data := []mmdbtype.DataType{mmdbtype.String("US")}
 
 	err := acc.Process(netip.MustParsePrefix("10.0.0.0/25"), data)
 	require.NoError(t, err)
@@ -110,18 +114,18 @@ func TestAccumulator_AdjacentNetworksWithSameData(t *testing.T) {
 
 func TestAccumulator_AdjacentNetworksWithDifferentData(t *testing.T) {
 	writer := &mockWriter{}
-	acc := NewAccumulator(writer, true)
+	acc := NewAccumulator(writer, true, newSlicePool(1))
 
 	// Process two adjacent networks with different data
 	err := acc.Process(
 		netip.MustParsePrefix("10.0.0.0/25"),
-		mmdbtype.Map{mmdbtype.String("country"): mmdbtype.String("US")},
+		[]mmdbtype.DataType{mmdbtype.String("US")},
 	)
 	require.NoError(t, err)
 
 	err = acc.Process(
 		netip.MustParsePrefix("10.0.0.128/25"),
-		mmdbtype.Map{mmdbtype.String("country"): mmdbtype.String("CA")},
+		[]mmdbtype.DataType{mmdbtype.String("CA")},
 	)
 	require.NoError(t, err)
 
@@ -134,23 +138,23 @@ func TestAccumulator_AdjacentNetworksWithDifferentData(t *testing.T) {
 	assert.Equal(t, netip.MustParsePrefix("10.0.0.0/25"), writer.rows[0].prefix)
 	assert.Equal(
 		t,
-		mmdbtype.Map{mmdbtype.String("country"): mmdbtype.String("US")},
+		[]mmdbtype.DataType{mmdbtype.String("US")},
 		writer.rows[0].data,
 	)
 	assert.Equal(t, netip.MustParsePrefix("10.0.0.128/25"), writer.rows[1].prefix)
 	assert.Equal(
 		t,
-		mmdbtype.Map{mmdbtype.String("country"): mmdbtype.String("CA")},
+		[]mmdbtype.DataType{mmdbtype.String("CA")},
 		writer.rows[1].data,
 	)
 }
 
 func TestAccumulator_NonAdjacentNetworks(t *testing.T) {
 	writer := &mockWriter{}
-	acc := NewAccumulator(writer, true)
+	acc := NewAccumulator(writer, true, newSlicePool(1))
 
 	// Process two non-adjacent networks with same data
-	data := mmdbtype.Map{mmdbtype.String("country"): mmdbtype.String("US")}
+	data := []mmdbtype.DataType{mmdbtype.String("US")}
 
 	err := acc.Process(netip.MustParsePrefix("10.0.0.0/24"), data)
 	require.NoError(t, err)
@@ -171,10 +175,10 @@ func TestAccumulator_NonAdjacentNetworks(t *testing.T) {
 
 func TestAccumulator_MultipleAdjacentMerges(t *testing.T) {
 	writer := &mockWriter{}
-	acc := NewAccumulator(writer, true)
+	acc := NewAccumulator(writer, true, newSlicePool(1))
 
 	// Process four adjacent /26 networks with same data
-	data := mmdbtype.Map{mmdbtype.String("country"): mmdbtype.String("US")}
+	data := []mmdbtype.DataType{mmdbtype.String("US")}
 
 	err := acc.Process(netip.MustParsePrefix("10.0.0.0/26"), data)
 	require.NoError(t, err)
@@ -199,10 +203,10 @@ func TestAccumulator_MultipleAdjacentMerges(t *testing.T) {
 
 func TestAccumulator_UnalignedMerge(t *testing.T) {
 	writer := &mockWriter{}
-	acc := NewAccumulator(writer, true)
+	acc := NewAccumulator(writer, true, newSlicePool(1))
 
 	// Process networks that merge into an unaligned range
-	data := mmdbtype.Map{mmdbtype.String("country"): mmdbtype.String("US")}
+	data := []mmdbtype.DataType{mmdbtype.String("US")}
 
 	// 10.0.0.1/32 through 10.0.0.6/32
 	err := acc.Process(netip.MustParsePrefix("10.0.0.1/32"), data)
@@ -239,9 +243,9 @@ func TestAccumulator_UnalignedMerge(t *testing.T) {
 
 func TestAccumulator_RangeWriterReceivesSingleRange(t *testing.T) {
 	writer := &mockRangeWriter{}
-	acc := NewAccumulator(writer, true)
+	acc := NewAccumulator(writer, true, newSlicePool(1))
 
-	data := mmdbtype.Map{mmdbtype.String("country"): mmdbtype.String("CN")}
+	data := []mmdbtype.DataType{mmdbtype.String("CN")}
 
 	require.NoError(t, acc.Process(netip.MustParsePrefix("1.0.1.0/24"), data))
 	require.NoError(t, acc.Process(netip.MustParsePrefix("1.0.2.0/23"), data))
@@ -256,9 +260,9 @@ func TestAccumulator_RangeWriterReceivesSingleRange(t *testing.T) {
 
 func TestAccumulator_IPv6AdjacentMerging(t *testing.T) {
 	writer := &mockWriter{}
-	acc := NewAccumulator(writer, true)
+	acc := NewAccumulator(writer, true, newSlicePool(1))
 
-	data := mmdbtype.Map{mmdbtype.String("continent"): mmdbtype.String("NA")}
+	data := []mmdbtype.DataType{mmdbtype.String("NA")}
 
 	err := acc.Process(netip.MustParsePrefix("2001:db8::/127"), data)
 	require.NoError(t, err)
@@ -273,9 +277,9 @@ func TestAccumulator_IPv6AdjacentMerging(t *testing.T) {
 
 func TestAccumulator_IPv6UnalignedRange(t *testing.T) {
 	writer := &mockWriter{}
-	acc := NewAccumulator(writer, true)
+	acc := NewAccumulator(writer, true, newSlicePool(1))
 
-	data := mmdbtype.Map{mmdbtype.String("continent"): mmdbtype.String("EU")}
+	data := []mmdbtype.DataType{mmdbtype.String("EU")}
 
 	addresses := []string{"2001:db8::1/128", "2001:db8::2/128", "2001:db8::3/128"}
 	for _, cidr := range addresses {
@@ -291,7 +295,7 @@ func TestAccumulator_IPv6UnalignedRange(t *testing.T) {
 
 func TestAccumulator_EmptyFlush(t *testing.T) {
 	writer := &mockWriter{}
-	acc := NewAccumulator(writer, true)
+	acc := NewAccumulator(writer, true, newSlicePool(1))
 
 	// Flush without processing anything
 	err := acc.Flush()
@@ -303,12 +307,12 @@ func TestAccumulator_EmptyFlush(t *testing.T) {
 
 func TestAccumulator_MultipleFlushes(t *testing.T) {
 	writer := &mockWriter{}
-	acc := NewAccumulator(writer, true)
+	acc := NewAccumulator(writer, true, newSlicePool(1))
 
 	// First batch
 	err := acc.Process(
 		netip.MustParsePrefix("10.0.0.0/24"),
-		mmdbtype.Map{mmdbtype.String("country"): mmdbtype.String("US")},
+		[]mmdbtype.DataType{mmdbtype.String("US")},
 	)
 	require.NoError(t, err)
 
@@ -318,7 +322,7 @@ func TestAccumulator_MultipleFlushes(t *testing.T) {
 	// Second batch
 	err = acc.Process(
 		netip.MustParsePrefix("10.0.1.0/24"),
-		mmdbtype.Map{mmdbtype.String("country"): mmdbtype.String("CA")},
+		[]mmdbtype.DataType{mmdbtype.String("CA")},
 	)
 	require.NoError(t, err)
 
@@ -329,22 +333,22 @@ func TestAccumulator_MultipleFlushes(t *testing.T) {
 	require.Len(t, writer.rows, 2)
 	assert.Equal(
 		t,
-		mmdbtype.Map{mmdbtype.String("country"): mmdbtype.String("US")},
+		[]mmdbtype.DataType{mmdbtype.String("US")},
 		writer.rows[0].data,
 	)
 	assert.Equal(
 		t,
-		mmdbtype.Map{mmdbtype.String("country"): mmdbtype.String("CA")},
+		[]mmdbtype.DataType{mmdbtype.String("CA")},
 		writer.rows[1].data,
 	)
 }
 
 func TestAccumulator_IPv6(t *testing.T) {
 	writer := &mockWriter{}
-	acc := NewAccumulator(writer, true)
+	acc := NewAccumulator(writer, true, newSlicePool(1))
 
 	// Process adjacent IPv6 networks
-	data := mmdbtype.Map{mmdbtype.String("country"): mmdbtype.String("US")}
+	data := []mmdbtype.DataType{mmdbtype.String("US")}
 
 	err := acc.Process(netip.MustParsePrefix("2001:db8::0/127"), data)
 	require.NoError(t, err)
@@ -363,26 +367,26 @@ func TestAccumulator_IPv6(t *testing.T) {
 
 func TestAccumulator_SkipEmptyRows(t *testing.T) {
 	writer := &mockWriter{}
-	acc := NewAccumulator(writer, false) // Don't include empty rows
+	acc := NewAccumulator(writer, false, newSlicePool(1)) // Don't include empty rows
 
 	// Process a network with data
 	err := acc.Process(
 		netip.MustParsePrefix("10.0.0.0/24"),
-		mmdbtype.Map{mmdbtype.String("country"): mmdbtype.String("US")},
+		[]mmdbtype.DataType{mmdbtype.String("US")},
 	)
 	require.NoError(t, err)
 
 	// Process a network with empty data (should be skipped)
 	err = acc.Process(
 		netip.MustParsePrefix("10.0.1.0/24"),
-		mmdbtype.Map{},
+		[]mmdbtype.DataType{nil},
 	)
 	require.NoError(t, err)
 
 	// Process another network with data
 	err = acc.Process(
 		netip.MustParsePrefix("10.0.2.0/24"),
-		mmdbtype.Map{mmdbtype.String("country"): mmdbtype.String("CA")},
+		[]mmdbtype.DataType{mmdbtype.String("CA")},
 	)
 	require.NoError(t, err)
 
@@ -395,39 +399,39 @@ func TestAccumulator_SkipEmptyRows(t *testing.T) {
 	assert.Equal(t, netip.MustParsePrefix("10.0.0.0/24"), writer.rows[0].prefix)
 	assert.Equal(
 		t,
-		mmdbtype.Map{mmdbtype.String("country"): mmdbtype.String("US")},
+		[]mmdbtype.DataType{mmdbtype.String("US")},
 		writer.rows[0].data,
 	)
 	assert.Equal(t, netip.MustParsePrefix("10.0.2.0/24"), writer.rows[1].prefix)
 	assert.Equal(
 		t,
-		mmdbtype.Map{mmdbtype.String("country"): mmdbtype.String("CA")},
+		[]mmdbtype.DataType{mmdbtype.String("CA")},
 		writer.rows[1].data,
 	)
 }
 
 func TestAccumulator_IncludeEmptyRows(t *testing.T) {
 	writer := &mockWriter{}
-	acc := NewAccumulator(writer, true) // Include empty rows
+	acc := NewAccumulator(writer, true, newSlicePool(1)) // Include empty rows
 
 	// Process a network with data
 	err := acc.Process(
 		netip.MustParsePrefix("10.0.0.0/24"),
-		mmdbtype.Map{mmdbtype.String("country"): mmdbtype.String("US")},
+		[]mmdbtype.DataType{mmdbtype.String("US")},
 	)
 	require.NoError(t, err)
 
 	// Process a network with empty data (should be included)
 	err = acc.Process(
 		netip.MustParsePrefix("10.0.1.0/24"),
-		mmdbtype.Map{},
+		[]mmdbtype.DataType{nil},
 	)
 	require.NoError(t, err)
 
 	// Process another network with data
 	err = acc.Process(
 		netip.MustParsePrefix("10.0.2.0/24"),
-		mmdbtype.Map{mmdbtype.String("country"): mmdbtype.String("CA")},
+		[]mmdbtype.DataType{mmdbtype.String("CA")},
 	)
 	require.NoError(t, err)
 
@@ -440,32 +444,32 @@ func TestAccumulator_IncludeEmptyRows(t *testing.T) {
 	assert.Equal(t, netip.MustParsePrefix("10.0.0.0/24"), writer.rows[0].prefix)
 	assert.Equal(
 		t,
-		mmdbtype.Map{mmdbtype.String("country"): mmdbtype.String("US")},
+		[]mmdbtype.DataType{mmdbtype.String("US")},
 		writer.rows[0].data,
 	)
 	assert.Equal(t, netip.MustParsePrefix("10.0.1.0/24"), writer.rows[1].prefix)
-	assert.Equal(t, mmdbtype.Map{}, writer.rows[1].data)
+	assert.Equal(t, []mmdbtype.DataType{nil}, writer.rows[1].data)
 	assert.Equal(t, netip.MustParsePrefix("10.0.2.0/24"), writer.rows[2].prefix)
 	assert.Equal(
 		t,
-		mmdbtype.Map{mmdbtype.String("country"): mmdbtype.String("CA")},
+		[]mmdbtype.DataType{mmdbtype.String("CA")},
 		writer.rows[2].data,
 	)
 }
 
 func TestAccumulator_SkipEmptyDoesNotAffectMerging(t *testing.T) {
 	writer := &mockWriter{}
-	acc := NewAccumulator(writer, false) // Don't include empty rows
+	acc := NewAccumulator(writer, false, newSlicePool(1)) // Don't include empty rows
 
 	// Process three adjacent networks with empty data
 	// These would normally merge, but since they're all empty, they should all be skipped
-	err := acc.Process(netip.MustParsePrefix("10.0.0.0/26"), mmdbtype.Map{})
+	err := acc.Process(netip.MustParsePrefix("10.0.0.0/26"), []mmdbtype.DataType{nil})
 	require.NoError(t, err)
 
-	err = acc.Process(netip.MustParsePrefix("10.0.0.64/26"), mmdbtype.Map{})
+	err = acc.Process(netip.MustParsePrefix("10.0.0.64/26"), []mmdbtype.DataType{nil})
 	require.NoError(t, err)
 
-	err = acc.Process(netip.MustParsePrefix("10.0.0.128/26"), mmdbtype.Map{})
+	err = acc.Process(netip.MustParsePrefix("10.0.0.128/26"), []mmdbtype.DataType{nil})
 	require.NoError(t, err)
 
 	// Flush
@@ -479,47 +483,62 @@ func TestAccumulator_SkipEmptyDoesNotAffectMerging(t *testing.T) {
 func TestDataEquals(t *testing.T) {
 	tests := []struct {
 		name     string
-		a        mmdbtype.Map
-		b        mmdbtype.Map
+		a        []mmdbtype.DataType
+		b        []mmdbtype.DataType
 		expected bool
 	}{
 		{
-			name:     "empty maps",
-			a:        mmdbtype.Map{},
-			b:        mmdbtype.Map{},
+			name:     "empty slices",
+			a:        []mmdbtype.DataType{},
+			b:        []mmdbtype.DataType{},
 			expected: true,
 		},
 		{
-			name: "identical maps",
-			a: mmdbtype.Map{
-				mmdbtype.String("country"): mmdbtype.String("US"),
-				mmdbtype.String("city"):    mmdbtype.String("NYC"),
+			name: "identical slices",
+			a: []mmdbtype.DataType{
+				mmdbtype.String("US"),
+				mmdbtype.String("NYC"),
 			},
-			b: mmdbtype.Map{
-				mmdbtype.String("country"): mmdbtype.String("US"),
-				mmdbtype.String("city"):    mmdbtype.String("NYC"),
+			b: []mmdbtype.DataType{
+				mmdbtype.String("US"),
+				mmdbtype.String("NYC"),
 			},
 			expected: true,
 		},
 		{
 			name:     "different values",
-			a:        mmdbtype.Map{mmdbtype.String("country"): mmdbtype.String("US")},
-			b:        mmdbtype.Map{mmdbtype.String("country"): mmdbtype.String("CA")},
+			a:        []mmdbtype.DataType{mmdbtype.String("US")},
+			b:        []mmdbtype.DataType{mmdbtype.String("CA")},
 			expected: false,
 		},
 		{
-			name:     "different keys",
-			a:        mmdbtype.Map{mmdbtype.String("country"): mmdbtype.String("US")},
-			b:        mmdbtype.Map{mmdbtype.String("region"): mmdbtype.String("US")},
+			name:     "different lengths",
+			a:        []mmdbtype.DataType{mmdbtype.String("US")},
+			b:        []mmdbtype.DataType{mmdbtype.String("US"), mmdbtype.String("NYC")},
 			expected: false,
 		},
 		{
-			name: "different lengths",
-			a:    mmdbtype.Map{mmdbtype.String("country"): mmdbtype.String("US")},
-			b: mmdbtype.Map{
-				mmdbtype.String("country"): mmdbtype.String("US"),
-				mmdbtype.String("city"):    mmdbtype.String("NYC"),
-			},
+			name:     "both nil values",
+			a:        []mmdbtype.DataType{nil, nil},
+			b:        []mmdbtype.DataType{nil, nil},
+			expected: true,
+		},
+		{
+			name:     "one nil, one value",
+			a:        []mmdbtype.DataType{nil},
+			b:        []mmdbtype.DataType{mmdbtype.String("US")},
+			expected: false,
+		},
+		{
+			name:     "mixed nil and values, identical",
+			a:        []mmdbtype.DataType{mmdbtype.String("US"), nil, mmdbtype.String("NYC")},
+			b:        []mmdbtype.DataType{mmdbtype.String("US"), nil, mmdbtype.String("NYC")},
+			expected: true,
+		},
+		{
+			name:     "mixed nil and values, different",
+			a:        []mmdbtype.DataType{mmdbtype.String("US"), nil},
+			b:        []mmdbtype.DataType{nil, mmdbtype.String("US")},
 			expected: false,
 		},
 	}

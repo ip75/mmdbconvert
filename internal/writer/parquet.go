@@ -80,7 +80,7 @@ func NewParquetWriterWithIPVersion(
 }
 
 // WriteRow writes a single row with network prefix and column data.
-func (w *ParquetWriter) WriteRow(prefix netip.Prefix, data mmdbtype.Map) error {
+func (w *ParquetWriter) WriteRow(prefix netip.Prefix, data []mmdbtype.DataType) error {
 	// Build row with network columns + data columns
 	row := map[string]any{}
 
@@ -94,8 +94,8 @@ func (w *ParquetWriter) WriteRow(prefix netip.Prefix, data mmdbtype.Map) error {
 	}
 
 	// Add data column values (with type conversion)
-	for _, col := range w.config.Columns {
-		value := data[col.Name]
+	for i, col := range w.config.Columns {
+		value := data[i]
 		converted, err := convertToParquetType(value, col.Type)
 		if err != nil {
 			return fmt.Errorf("converting column '%s': %w", col.Name, err)

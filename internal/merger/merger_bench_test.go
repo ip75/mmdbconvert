@@ -14,7 +14,7 @@ import (
 // discardWriter is a RowWriter that discards all data (for benchmarking).
 type discardWriter struct{}
 
-func (d *discardWriter) WriteRow(_ netip.Prefix, _ mmdbtype.Map) error {
+func (d *discardWriter) WriteRow(_ netip.Prefix, _ []mmdbtype.DataType) error {
 	return nil
 }
 

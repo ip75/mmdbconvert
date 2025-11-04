@@ -12,6 +12,7 @@ import (
 	"net/netip"
 	"slices"
 	"strings"
+	"sync"
 
 	"github.com/maxmind/mmdbwriter/mmdbtype"
 	"github.com/oschwald/maxminddb-golang/v2"
@@ -21,14 +22,48 @@ import (
 	"github.com/maxmind/mmdbconvert/internal/network"
 )
 
+// slicePool manages reusable data slices to reduce allocations.
+type slicePool struct {
+	pool sync.Pool
+	size int
+}
+
+// newSlicePool creates a pool for slices of the given size.
+func newSlicePool(size int) *slicePool {
+	return &slicePool{
+		pool: sync.Pool{
+			New: func() any {
+				return make([]mmdbtype.DataType, size)
+			},
+		},
+		size: size,
+	}
+}
+
+// Get retrieves a cleared slice from the pool.
+func (p *slicePool) Get() []mmdbtype.DataType {
+	s := p.pool.Get().([]mmdbtype.DataType)
+	clear(s)
+	return s
+}
+
+// Put returns a slice to the pool.
+func (p *slicePool) Put(s []mmdbtype.DataType) {
+	if len(s) == p.size {
+		//nolint:staticcheck // SA6002: slices are reference types, no allocation here
+		p.pool.Put(s)
+	}
+}
+
 // columnExtractor caches the reader and path segments for a column to avoid
 // per-row lookups and allocations.
 type columnExtractor struct {
 	reader   *mmdb.Reader    // Pre-resolved reader for this column
 	path     []any           // Cached path segments (avoids per-row slice allocation)
-	name     mmdbtype.String // Column name for error messages and map key
+	name     mmdbtype.String // Column name for error messages
 	database string          // Database name for error messages
 	dbIndex  int             // Index in readersList for O(1) Result lookup
+	colIndex int             // Index in config.Columns for slice ordering
 }
 
 // Merger handles merging multiple MMDB databases into a single output stream.
@@ -40,6 +75,8 @@ type Merger struct {
 	dbNamesList  []string          // Corresponding database names
 	extractors   []columnExtractor // Pre-built extractors for each column
 	unmarshalers []*mmdbtype.Unmarshaler
+	slicePool    *slicePool          // Pool for reusable data slices
+	workingSlice []mmdbtype.DataType // Reusable working slice (cleared each iteration)
 }
 
 // NewMerger creates a new merger instance.
@@ -50,11 +87,16 @@ func NewMerger(readers *mmdb.Readers, cfg *config.Config, writer RowWriter) (*Me
 		includeEmptyRows = *cfg.Output.IncludeEmptyRows
 	}
 
-	// Create Merger instance early so we can call methods on it
+	// Create slice pool for reusable data slices
+	slicePool := newSlicePool(len(cfg.Columns))
+
+	// Create Merger instance with pool
 	m := &Merger{
-		readers: readers,
-		config:  cfg,
-		acc:     NewAccumulator(writer, includeEmptyRows),
+		readers:      readers,
+		config:       cfg,
+		acc:          NewAccumulator(writer, includeEmptyRows, slicePool),
+		slicePool:    slicePool,
+		workingSlice: make([]mmdbtype.DataType, len(cfg.Columns)),
 	}
 
 	// Build ordered list of unique database names
@@ -119,6 +161,7 @@ func NewMerger(readers *mmdb.Readers, cfg *config.Config, writer RowWriter) (*Me
 			name:     column.Name,
 			database: column.Database,
 			dbIndex:  dbIdx,
+			colIndex: i,
 		}
 	}
 	m.extractors = extractors
@@ -257,9 +300,9 @@ func (m *Merger) extractAndProcess(
 		}
 		// If not a Map, leave decodedRecords[i] as nil (no data for this database)
 	}
-
-	// Step 2: Extract column values from cached records
-	data := make(mmdbtype.Map, len(m.extractors))
+	// Step 2: Extract column values into reusable working slice
+	// Clear the working slice before reuse
+	clear(m.workingSlice)
 
 	for _, extractor := range m.extractors {
 		// Check if reader was resolved during initialization
@@ -292,14 +335,15 @@ func (m *Merger) extractAndProcess(
 			)
 		}
 
-		// Only add non-nil values to reduce allocations and simplify empty detection
+		// Store value at column index (nil values are OK - they indicate missing data)
 		if value != nil {
-			data[extractor.name] = value
+			m.workingSlice[extractor.colIndex] = value
 		}
 	}
 
 	// Use the effectivePrefix parameter - NOT derived from results!
-	return m.acc.Process(effectivePrefix, data)
+	// The accumulator will copy this slice to a pooled slice if data changes
+	return m.acc.Process(effectivePrefix, m.workingSlice)
 }
 
 // walkPath navigates through a nested mmdbtype.Map/Slice structure using the given path.

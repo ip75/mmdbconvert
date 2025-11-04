@@ -58,9 +58,10 @@ func TestMerger_SingleDatabase(t *testing.T) {
 	// Should have written some rows
 	assert.NotEmpty(t, writer.rows, "should write at least one row")
 
-	// Verify each row has the expected column
+	// Verify each row has data in the country_code column (index 0)
 	for _, row := range writer.rows {
-		assert.Contains(t, row.data, mmdbtype.String("country_code"))
+		assert.Len(t, row.data, 1, "should have 1 column")
+		// country_code column should have data (not checking nil since some rows may not have it)
 	}
 }
 
@@ -331,11 +332,11 @@ func TestMerger_NilValues(t *testing.T) {
 	// Should have some rows
 	assert.NotEmpty(t, writer.rows)
 
-	// Some rows may have nil values for postal_code
+	// Some rows may have nil values for postal_code (column index 0)
 	hasNil := false
 	hasValue := false
 	for _, row := range writer.rows {
-		if row.data["postal_code"] == nil {
+		if row.data[0] == nil {
 			hasNil = true
 		} else {
 			hasValue = true
@@ -458,7 +459,8 @@ func TestMerger_BroaderDatabase(t *testing.T) {
 	// Check that we have some rows with data from both databases
 	hasBoth := false
 	for _, row := range writer.rows {
-		if row.data["country"] != nil && row.data["is_anon"] != nil {
+		// Column 0: country, Column 1: is_anon
+		if row.data[0] != nil && row.data[1] != nil {
 			hasBoth = true
 			break
 		}
@@ -503,8 +505,9 @@ func TestMerger_MissingData(t *testing.T) {
 	// Should have some rows where one database has data but the other doesn't
 	hasPartialData := false
 	for _, row := range writer.rows {
-		countryExists := row.data["country"] != nil
-		anonExists := row.data["is_anon"] != nil
+		// Column 0: country, Column 1: is_anon
+		countryExists := row.data[0] != nil
+		anonExists := row.data[1] != nil
 
 		// XOR: one exists but not both
 		if (countryExists && !anonExists) || (!countryExists && anonExists) {
@@ -570,13 +573,14 @@ func TestMerger_NoRedundantLookups(t *testing.T) {
 	hasMultipleColumns := false
 	for _, row := range writer.rows {
 		columnCount := 0
-		if row.data["country"] != nil {
+		// Column 0: country, Column 1: city_name, Column 2: continent
+		if row.data[0] != nil {
 			columnCount++
 		}
-		if row.data["city_name"] != nil {
+		if row.data[1] != nil {
 			columnCount++
 		}
-		if row.data["continent"] != nil {
+		if row.data[2] != nil {
 			columnCount++
 		}
 		if columnCount >= 2 {
