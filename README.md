@@ -23,8 +23,6 @@ Parquet, or MMDB format.
 - ✅ **Flexible column mapping** - Extract any fields from MMDB databases using
   JSON paths
 - ✅ **IPv4 and IPv6 support** - Handle both IP versions seamlessly
-- ✅ **Streaming architecture** - O(1) memory usage regardless of database size
-  (for CSV and Parquet only)
 - ✅ **Type hints for Parquet** - Native int64, float64, bool types for
   efficient storage
 
@@ -414,43 +412,6 @@ Convert MMDB databases to CSV/Parquet for loading into data warehouses:
 - BigQuery
 - Databricks
 
-## Performance
-
-### Memory Efficiency
-
-- **O(1) memory usage** - Streaming architecture processes networks on-the-fly
-  (for CSV and Parquet only)
-- **Peak memory: 333MB** for processing 13.8M rows (3.7GB output)
-- Memory usage independent of database size
-- Handles databases with millions of networks efficiently
-
-### Processing Speed
-
-Measured performance with GeoIP2-Enterprise + Anonymous-IP databases:
-
-| Metric          | Value                                  |
-| --------------- | -------------------------------------- |
-| **Throughput**  | ~120,000 rows/second                   |
-| **Data Rate**   | ~32 MB/second CSV output               |
-| **13.8M rows**  | 1 minute 58 seconds                    |
-| **50+ columns** | 3.7GB output (2.5GB IPv4 + 1.2GB IPv6) |
-
-**Test Environment:** 13th Gen Intel Core i7-13700K, processing Enterprise +
-Anonymous-IP with 50+ columns
-
-### Query Performance (Parquet)
-
-With integer columns (`start_int`, `end_int`):
-
-| Query Type      | Performance | Comparison                 |
-| --------------- | ----------- | -------------------------- |
-| Single IP       | 5-10ms      | 40-50x faster than strings |
-| Batch 1000 IPs  | 100-200ms   | 200-300x faster            |
-| Full table scan | 200-500ms   | Similar to strings         |
-
-**See [docs/parquet-queries.md](docs/parquet-queries.md) for optimization
-details.**
-
 ## Architecture
 
 ### Streaming Network Merge
@@ -461,8 +422,6 @@ mmdbconvert uses a streaming accumulator algorithm:
 2. **Smallest network selection** - Always chooses most specific network block
 3. **Data extraction** from all databases for each network
 4. **Adjacent network merging** - Combines networks with identical data
-5. **Immediate output** - Writes rows as soon as data changes (O(1) memory for
-   CSV and Parquet)
 
 ### Non-Overlapping Networks
 
