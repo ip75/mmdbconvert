@@ -80,7 +80,7 @@ func NewParquetWriterWithIPVersion(
 }
 
 // WriteRow writes a single row with network prefix and column data.
-func (w *ParquetWriter) WriteRow(prefix netip.Prefix, data map[string]any) error {
+func (w *ParquetWriter) WriteRow(prefix netip.Prefix, data mmdbtype.Map) error {
 	// Build row with network columns + data columns
 	row := map[string]any{}
 
@@ -90,7 +90,7 @@ func (w *ParquetWriter) WriteRow(prefix netip.Prefix, data map[string]any) error
 		if err != nil {
 			return fmt.Errorf("generating network column '%s': %w", netCol.Name, err)
 		}
-		row[netCol.Name] = value
+		row[string(netCol.Name)] = value
 	}
 
 	// Add data column values (with type conversion)
@@ -100,7 +100,7 @@ func (w *ParquetWriter) WriteRow(prefix netip.Prefix, data map[string]any) error
 		if err != nil {
 			return fmt.Errorf("converting column '%s': %w", col.Name, err)
 		}
-		row[col.Name] = converted
+		row[string(col.Name)] = converted
 	}
 
 	// Write the row
@@ -205,7 +205,7 @@ func buildSchema(cfg *config.Config, ipVersion int) (*parquet.Schema, error) {
 				err,
 			)
 		}
-		fields[netCol.Name] = node
+		fields[string(netCol.Name)] = node
 	}
 
 	// Add data columns
@@ -214,7 +214,7 @@ func buildSchema(cfg *config.Config, ipVersion int) (*parquet.Schema, error) {
 		if err != nil {
 			return nil, fmt.Errorf("building node for column '%s': %w", col.Name, err)
 		}
-		fields[col.Name] = node
+		fields[string(col.Name)] = node
 	}
 
 	schema := parquet.NewSchema("mmdb", fields)

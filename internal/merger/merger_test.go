@@ -5,6 +5,7 @@ import (
 	"net/netip"
 	"testing"
 
+	"github.com/maxmind/mmdbwriter/mmdbtype"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -58,7 +59,7 @@ func TestMerger_SingleDatabase(t *testing.T) {
 
 	// Verify each row has the expected column
 	for _, row := range writer.rows {
-		assert.Contains(t, row.data, "country_code")
+		assert.Contains(t, row.data, mmdbtype.String("country_code"))
 	}
 }
 

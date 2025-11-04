@@ -46,7 +46,7 @@ func NewMMDBWriter(outputPath string, cfg *config.Config, ipVersion int) (*MMDBW
 }
 
 // WriteRow writes a single row with network prefix and column data.
-func (w *MMDBWriter) WriteRow(prefix netip.Prefix, data map[string]any) error {
+func (w *MMDBWriter) WriteRow(prefix netip.Prefix, data mmdbtype.Map) error {
 	nested, err := w.buildNestedData(data)
 	if err != nil {
 		return fmt.Errorf("building nested data: %w", err)
@@ -61,7 +61,7 @@ func (w *MMDBWriter) WriteRow(prefix netip.Prefix, data map[string]any) error {
 }
 
 // WriteRange writes a range of IP addresses with the same data.
-func (w *MMDBWriter) WriteRange(start, end netip.Addr, data map[string]any) error {
+func (w *MMDBWriter) WriteRange(start, end netip.Addr, data mmdbtype.Map) error {
 	nested, err := w.buildNestedData(data)
 	if err != nil {
 		return fmt.Errorf("building nested data: %w", err)
@@ -94,7 +94,7 @@ func (w *MMDBWriter) Flush() error {
 }
 
 // buildNestedData converts flat column data to nested mmdbtype.Map.
-func (w *MMDBWriter) buildNestedData(flatData map[string]any) (mmdbtype.Map, error) {
+func (w *MMDBWriter) buildNestedData(flatData mmdbtype.Map) (mmdbtype.Map, error) {
 	root := make(mmdbtype.Map)
 
 	for _, col := range w.config.Columns {

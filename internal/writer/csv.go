@@ -77,7 +77,7 @@ func NewCSVWriter(w io.Writer, cfg *config.Config) *CSVWriter {
 }
 
 // WriteRow writes a single row with network prefix and column data.
-func (w *CSVWriter) WriteRow(prefix netip.Prefix, data map[string]any) error {
+func (w *CSVWriter) WriteRow(prefix netip.Prefix, data mmdbtype.Map) error {
 	if err := w.ensureHeader(); err != nil {
 		return err
 	}
@@ -124,7 +124,7 @@ func (w *CSVWriter) Flush() error {
 // WriteRange implements merger.RangeRowWriter, emitting a single row when the
 // configured network columns support ranges, or falling back to prefix output
 // otherwise.
-func (w *CSVWriter) WriteRange(start, end netip.Addr, data map[string]any) error {
+func (w *CSVWriter) WriteRange(start, end netip.Addr, data mmdbtype.Map) error {
 	if !w.rangeCapable {
 		cidrs := netipx.IPRangeFrom(start, end).Prefixes()
 		for _, cidr := range cidrs {
@@ -170,12 +170,12 @@ func (w *CSVWriter) writeHeader() error {
 
 	// Add network column names
 	for _, netCol := range w.config.Network.Columns {
-		header = append(header, netCol.Name)
+		header = append(header, string(netCol.Name))
 	}
 
 	// Add data column names
 	for _, col := range w.config.Columns {
-		header = append(header, col.Name)
+		header = append(header, string(col.Name))
 	}
 
 	if err := w.writer.Write(header); err != nil {

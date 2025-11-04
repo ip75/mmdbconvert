@@ -3,8 +3,8 @@ package merger
 import (
 	"fmt"
 	"net/netip"
-	"reflect"
 
+	"github.com/maxmind/mmdbwriter/mmdbtype"
 	"go4.org/netipx"
 
 	"github.com/maxmind/mmdbconvert/internal/network"
@@ -14,18 +14,18 @@ import (
 type AccumulatedRange struct {
 	StartIP netip.Addr
 	EndIP   netip.Addr
-	Data    map[string]any // column_name -> value
+	Data    mmdbtype.Map // column_name -> value
 }
 
 // RowWriter defines the interface for writing output rows.
 type RowWriter interface {
 	// WriteRow writes a single row with network prefix and column data.
-	WriteRow(prefix netip.Prefix, data map[string]any) error
+	WriteRow(prefix netip.Prefix, data mmdbtype.Map) error
 }
 
 // RangeRowWriter can accept full start/end ranges instead of prefixes.
 type RangeRowWriter interface {
-	WriteRange(start, end netip.Addr, data map[string]any) error
+	WriteRange(start, end netip.Addr, data mmdbtype.Map) error
 }
 
 // Accumulator accumulates adjacent networks with identical data and flushes
@@ -47,7 +47,7 @@ func NewAccumulator(writer RowWriter, includeEmptyRows bool) *Accumulator {
 // Process handles an incoming network with its data. If the network is adjacent
 // to the current accumulated range and has identical data, it extends the range.
 // Otherwise, it flushes the current range and starts a new accumulation.
-func (a *Accumulator) Process(prefix netip.Prefix, data map[string]any) error {
+func (a *Accumulator) Process(prefix netip.Prefix, data mmdbtype.Map) error {
 	// Skip rows with no data if includeEmptyRows is false (default)
 	if !a.includeEmptyRows && len(data) == 0 {
 		return nil
@@ -125,19 +125,7 @@ func (a *Accumulator) Flush() error {
 	return nil
 }
 
-// dataEquals performs deep equality check for data maps.
-func dataEquals(a, b map[string]any) bool {
-	if len(a) != len(b) {
-		return false
-	}
-	for key, av := range a {
-		bv, ok := b[key]
-		if !ok {
-			return false
-		}
-		if !reflect.DeepEqual(av, bv) {
-			return false
-		}
-	}
-	return true
+// dataEquals performs equality check for data maps using mmdbtype.Map.Equal.
+func dataEquals(a, b mmdbtype.Map) bool {
+	return a.Equal(b)
 }

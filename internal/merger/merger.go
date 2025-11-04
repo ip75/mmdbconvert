@@ -23,10 +23,10 @@ import (
 // columnExtractor caches the reader and path segments for a column to avoid
 // per-row lookups and allocations.
 type columnExtractor struct {
-	reader   *mmdb.Reader // Pre-resolved reader for this column
-	path     []any        // Cached path segments (avoids per-row slice allocation)
-	name     string       // Column name for error messages
-	database string       // Database name for error messages
+	reader   *mmdb.Reader    // Pre-resolved reader for this column
+	path     []any           // Cached path segments (avoids per-row slice allocation)
+	name     mmdbtype.String // Column name for error messages and map key
+	database string          // Database name for error messages
 }
 
 // Merger handles merging multiple MMDB databases into a single output stream.
@@ -197,7 +197,7 @@ func (m *Merger) processNetwork(currentNetwork netip.Prefix, dbIndex int) error 
 // extractAndProcess extracts data for all columns from all databases for the given network,
 // then feeds it to the accumulator.
 func (m *Merger) extractAndProcess(prefix netip.Prefix) error {
-	data := map[string]any{}
+	data := make(mmdbtype.Map)
 
 	// Extract values for all columns using cached extractors
 	for _, extractor := range m.extractors {

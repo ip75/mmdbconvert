@@ -5,11 +5,12 @@ import (
 	"fmt"
 	"net/netip"
 
+	"github.com/maxmind/mmdbwriter/mmdbtype"
 	"go4.org/netipx"
 )
 
 type rowWriter interface {
-	WriteRow(netip.Prefix, map[string]any) error
+	WriteRow(netip.Prefix, mmdbtype.Map) error
 }
 
 // SplitRowWriter routes rows to IPv4 or IPv6 writers based on the prefix.
@@ -24,7 +25,7 @@ func NewSplitRowWriter(ipv4, ipv6 rowWriter) *SplitRowWriter {
 }
 
 // WriteRow writes the row to the underlying IPv4 or IPv6 writer.
-func (s *SplitRowWriter) WriteRow(prefix netip.Prefix, data map[string]any) error {
+func (s *SplitRowWriter) WriteRow(prefix netip.Prefix, data mmdbtype.Map) error {
 	if prefix.Addr().Is4() {
 		if s.ipv4 == nil {
 			return errors.New("no IPv4 writer configured")
@@ -45,14 +46,14 @@ func (s *SplitRowWriter) WriteRow(prefix netip.Prefix, data map[string]any) erro
 // Accumulator. This method checks if the underlying writer implements WriteRange;
 // if so, it delegates directly. Otherwise, it converts the range to CIDRs and
 // calls WriteRow for each prefix.
-func (s *SplitRowWriter) WriteRange(start, end netip.Addr, data map[string]any) error {
+func (s *SplitRowWriter) WriteRange(start, end netip.Addr, data mmdbtype.Map) error {
 	if start.Is4() {
 		if s.ipv4 == nil {
 			return errors.New("no IPv4 writer configured")
 		}
 		// Check if the underlying writer implements WriteRange
 		if rangeWriter, ok := s.ipv4.(interface {
-			WriteRange(netip.Addr, netip.Addr, map[string]any) error
+			WriteRange(netip.Addr, netip.Addr, mmdbtype.Map) error
 		}); ok {
 			if err := rangeWriter.WriteRange(start, end, data); err != nil {
 				return fmt.Errorf("writing IPv4 range to underlying writer: %w", err)
@@ -73,7 +74,7 @@ func (s *SplitRowWriter) WriteRange(start, end netip.Addr, data map[string]any) 
 	}
 	// Check if the underlying writer implements WriteRange
 	if rangeWriter, ok := s.ipv6.(interface {
-		WriteRange(netip.Addr, netip.Addr, map[string]any) error
+		WriteRange(netip.Addr, netip.Addr, mmdbtype.Map) error
 	}); ok {
 		if err := rangeWriter.WriteRange(start, end, data); err != nil {
 			return fmt.Errorf("writing IPv6 range to underlying writer: %w", err)

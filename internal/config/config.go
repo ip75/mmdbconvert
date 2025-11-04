@@ -8,6 +8,7 @@ import (
 	"os"
 	"slices"
 
+	"github.com/maxmind/mmdbwriter/mmdbtype"
 	"github.com/pelletier/go-toml/v2"
 )
 
@@ -65,8 +66,8 @@ type NetworkConfig struct {
 
 // NetworkColumn defines a network column in the output.
 type NetworkColumn struct {
-	Name string `toml:"name"` // Column name
-	Type string `toml:"type"` // "cidr", "start_ip", "end_ip", "start_int", "end_int"
+	Name mmdbtype.String `toml:"name"` // Column name
+	Type string          `toml:"type"` // "cidr", "start_ip", "end_ip", "start_int", "end_int"
 }
 
 // Database defines an MMDB database source.
@@ -77,11 +78,11 @@ type Database struct {
 
 // Column defines a data column mapping from MMDB to output.
 type Column struct {
-	Name       string `toml:"name"`        // Output column name
-	Database   string `toml:"database"`    // Database to read from (references Database.Name)
-	Path       Path   `toml:"path"`        // Path segments to the field
-	OutputPath *Path  `toml:"output_path"` // Path segments for MMDB output (defaults to [name])
-	Type       string `toml:"type"`        // Optional type hint: "string", "int64", "float64", "bool", "binary" (Parquet only)
+	Name       mmdbtype.String `toml:"name"`        // Output column name
+	Database   string          `toml:"database"`    // Database to read from (references Database.Name)
+	Path       Path            `toml:"path"`        // Path segments to the field
+	OutputPath *Path           `toml:"output_path"` // Path segments for MMDB output (defaults to [name])
+	Type       string          `toml:"type"`        // Optional type hint: "string", "int64", "float64", "bool", "binary" (Parquet only)
 }
 
 // Path represents the decoded path segments for MMDB lookup.
@@ -312,7 +313,7 @@ func validate(config *Config) error {
 	validNetworkTypes := map[string]bool{
 		"cidr": true, "start_ip": true, "end_ip": true, "start_int": true, "end_int": true,
 	}
-	networkColNames := map[string]bool{}
+	networkColNames := map[mmdbtype.String]bool{}
 	for _, col := range config.Network.Columns {
 		if col.Name == "" {
 			return errors.New("network column name is required")
@@ -337,7 +338,7 @@ func validate(config *Config) error {
 	validDataTypes := map[string]bool{
 		"": true, "string": true, "int64": true, "float64": true, "bool": true, "binary": true,
 	}
-	dataColNames := map[string]bool{}
+	dataColNames := map[mmdbtype.String]bool{}
 	for _, col := range config.Columns {
 		if col.Name == "" {
 			return errors.New("column name is required")
