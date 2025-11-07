@@ -6,9 +6,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
-
-## [0.1.0] - 2025-10-31
+## [0.1.0] - 2025-11-07
 
 ### Added
 
@@ -22,7 +20,7 @@ and this project adheres to
 - IPv4 and IPv6 support
 - Network column types: CIDR, start_ip, end_ip, start_int, end_int
 - Data column type hints for Parquet: string, int64, float64, bool, binary
-- Streaming architecture with O(1) memory usage
+- Streaming architecture with O(1) memory usage for CSV and Parquet
 - Parquet compression options: snappy, gzip, lz4, zstd
 - Configurable row group size for Parquet
 - Progress reporting with --quiet flag
@@ -39,7 +37,6 @@ and this project adheres to
 
 ### Testing
 
-- 108 unit tests with 71.2% code coverage
 - Integration tests for CSV and Parquet output
 - Edge case handling (missing paths, nil values)
 - Multi-database merge validation
