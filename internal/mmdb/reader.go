@@ -12,7 +12,6 @@ import (
 // Reader wraps a maxminddb.Reader with additional functionality.
 type Reader struct {
 	reader *maxminddb.Reader
-	path   string
 }
 
 // Open opens an MMDB database file.
@@ -24,7 +23,6 @@ func Open(path string) (*Reader, error) {
 
 	return &Reader{
 		reader: reader,
-		path:   path,
 	}, nil
 }
 
@@ -47,16 +45,6 @@ func (r *Reader) NetworksWithin(
 	options ...maxminddb.NetworksOption,
 ) iter.Seq[maxminddb.Result] {
 	return r.reader.NetworksWithin(prefix, options...)
-}
-
-// Lookup looks up data for an IP address.
-func (r *Reader) Lookup(ip netip.Addr) maxminddb.Result {
-	return r.reader.Lookup(ip)
-}
-
-// Path returns the file path of the database.
-func (r *Reader) Path() string {
-	return r.path
 }
 
 // Metadata returns metadata about the database.

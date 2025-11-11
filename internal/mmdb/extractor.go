@@ -2,71 +2,11 @@ package mmdb
 
 import (
 	"fmt"
-	"net/netip"
-	"strconv"
-	"strings"
-
-	"github.com/maxmind/mmdbwriter/mmdbtype"
 )
-
-// ExtractValue extracts a value from an MMDB database for a given network and path.
-// The path must be a slice of map keys (strings) and/or array indices (ints).
-// Returns nil if the path doesn't exist (not an error).
-// The unmarshaler is reused across calls for caching efficiency and must be cleared
-// after retrieving the result.
-func ExtractValue(
-	reader *Reader,
-	network netip.Prefix,
-	path []any,
-	unmarshaler *mmdbtype.Unmarshaler,
-) (mmdbtype.DataType, error) {
-	segments, err := normalizeSegments(path)
-	if err != nil {
-		return nil, fmt.Errorf("invalid path %v: %w", path, err)
-	}
-
-	return extractValueNormalized(reader, network, segments, unmarshaler)
-}
-
-// ExtractValueNormalized is an optimized version of ExtractValue that accepts
-// pre-normalized path segments. Use NormalizeSegments to normalize paths once
-// during initialization, then use this function for repeated extractions.
-func ExtractValueNormalized(
-	reader *Reader,
-	network netip.Prefix,
-	normalizedSegments []any,
-	unmarshaler *mmdbtype.Unmarshaler,
-) (mmdbtype.DataType, error) {
-	return extractValueNormalized(reader, network, normalizedSegments, unmarshaler)
-}
-
-func extractValueNormalized(
-	reader *Reader,
-	network netip.Prefix,
-	segments []any,
-	unmarshaler *mmdbtype.Unmarshaler,
-) (mmdbtype.DataType, error) {
-	// Look up the network in the database
-	result := reader.Lookup(network.Addr())
-	if !result.Found() {
-		// Network not found in database - return nil (not an error)
-		return nil, nil
-	}
-
-	// Decode using unmarshaler (with caching!)
-	if err := result.DecodePath(unmarshaler, segments...); err != nil {
-		return nil, fmt.Errorf("decoding path %s: %w", describePath(segments), err)
-	}
-
-	value := unmarshaler.Result()
-	unmarshaler.Clear() // Reset for next column
-
-	return value, nil
-}
 
 // NormalizeSegments normalizes path segments by converting int64 to int and
 // validating types. Use this once during initialization and cache the result
-// to avoid repeated allocations when using ExtractValueNormalized.
+// to avoid repeated allocations.
 func NormalizeSegments(path []any) ([]any, error) {
 	return normalizeSegments(path)
 }
@@ -95,26 +35,6 @@ func normalizeSegments(path []any) ([]any, error) {
 	}
 
 	return segments, nil
-}
-
-func describePath(segments []any) string {
-	var b strings.Builder
-	b.WriteString("[")
-	for i, seg := range segments {
-		if i > 0 {
-			b.WriteString(" ")
-		}
-		switch v := seg.(type) {
-		case string:
-			b.WriteString(v)
-		case int:
-			b.WriteString(strconv.Itoa(v))
-		default:
-			b.WriteString(fmt.Sprintf("%v", v))
-		}
-	}
-	b.WriteString("]")
-	return b.String()
 }
 
 func minInt() int {

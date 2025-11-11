@@ -54,7 +54,6 @@ func TestOpen(t *testing.T) {
 			}
 			require.NoError(t, err)
 			assert.NotNil(t, reader)
-			assert.Equal(t, tt.path, reader.Path())
 			defer reader.Close()
 		})
 	}
@@ -151,7 +150,6 @@ func TestReaders_Get(t *testing.T) {
 		reader, ok := readers.Get("city")
 		assert.True(t, ok)
 		assert.NotNil(t, reader)
-		assert.Equal(t, cityTestDB, reader.Path())
 	})
 
 	t.Run("get non-existent database", func(t *testing.T) {
@@ -217,24 +215,4 @@ func TestReader_NetworksWithin(t *testing.T) {
 		count++
 	}
 	assert.Positive(t, count, "should have at least one network in prefix")
-}
-
-func TestReader_Lookup(t *testing.T) {
-	reader, err := Open(cityTestDB)
-	require.NoError(t, err)
-	defer reader.Close()
-
-	t.Run("lookup existing IP", func(t *testing.T) {
-		// This IP should exist in the City test database
-		ip := netip.MustParseAddr("81.2.69.142")
-		result := reader.Lookup(ip)
-		assert.True(t, result.Found())
-	})
-
-	t.Run("lookup non-existent IP", func(t *testing.T) {
-		// This IP should not exist in the database
-		ip := netip.MustParseAddr("10.0.0.1")
-		result := reader.Lookup(ip)
-		assert.False(t, result.Found())
-	})
 }
