@@ -1,6 +1,6 @@
 module github.com/maxmind/mmdbconvert
 
-go 1.25.3
+go 1.25.4
 
 require (
 	github.com/maxmind/mmdbwriter v1.1.1-0.20251104221330-fe6950f28326

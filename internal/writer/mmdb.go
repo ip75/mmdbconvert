@@ -71,9 +71,15 @@ func (w *MMDBWriter) WriteRange(start, end netip.Addr, data []mmdbtype.DataType)
 	for _, cidr := range cidrs {
 		ipnet := netipx.PrefixIPNet(cidr)
 		if err := w.tree.Insert(ipnet, nested); err != nil {
-			return fmt.Errorf("inserting %s: %w", cidr, err)
+			switch err.(type) {
+			case *mmdbwriter.ReservedNetworkError:
+				continue // Skip reserved IP ranges from databases provided by some government organizations
+			default:
+				return fmt.Errorf("inserting %s: %w", cidr, err)
+			}
 		}
 	}
+
 	return nil
 }
 

@@ -1,0 +1,41 @@
+[output]
+format = "mmdb"
+file = "geoip-country-merged.mmdb"
+
+[output.mmdb]
+database_type = "GeoIP2-Country"
+description = { en = "Russia + other Countries" }
+record_size = 28
+
+[[databases]]
+name = "russia"
+path = "RU-GeoIP-Country.mmdb"
+
+[[databases]]
+name = "world"
+path = "GeoLite2-Country.mmdb"
+
+[[columns]]
+name = "country_code_world"
+database = "world"
+path = ["country", "iso_code"]
+output_path = ["country", "iso_code"]
+
+[[columns]]
+name = "country_code_russian"
+database = "russia"
+path = ["country", "iso_code"]
+output_path = ["country", "iso_code"]
+
+# Resulting MMDB structure:
+# {
+#   "country": {"iso_code": "US", "names": {...}},
+#   "city": {"names": {...}},
+#   "location": {"latitude": 37.751, "longitude": -97.822},
+#   "traits": {
+#     "is_anonymous": true,
+#     "is_anonymous_vpn": false,
+#     "is_hosting_provider": false,
+#     ...
+#   }
+# }
