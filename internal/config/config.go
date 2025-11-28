@@ -73,8 +73,9 @@ type NetworkColumn struct {
 
 // Database defines an MMDB database source.
 type Database struct {
-	Name string `toml:"name"` // Identifier for referencing in columns
-	Path string `toml:"path"` // Path to MMDB file
+	Name     string `toml:"name"`     // Identifier for referencing in columns
+	Path     string `toml:"path"`     // Path to MMDB file
+	Priority int    `toml:"priority"` // Priority of the database. Network regions from higher priority databases overlaps databases with lower priority in result file.
 }
 
 // Column defines a data column mapping from MMDB to output.

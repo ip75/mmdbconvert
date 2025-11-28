@@ -21,10 +21,9 @@ const (
 // TestEndToEnd_CSVExport tests the complete flow from MMDB to CSV output.
 func TestEndToEnd_CSVExport(t *testing.T) {
 	// Open test database
-	databases := map[string]string{
-		"city": cityTestDB,
+	databases := map[string]config.Database{
+		"city": {Path: cityTestDB},
 	}
-
 	readers, err := mmdb.OpenDatabases(databases)
 	require.NoError(t, err)
 	defer readers.Close()
@@ -91,8 +90,8 @@ func TestEndToEnd_CSVExport(t *testing.T) {
 
 // TestEndToEnd_CSVExport_MultipleNetworkColumns tests CSV with multiple network column types.
 func TestEndToEnd_CSVExport_MultipleNetworkColumns(t *testing.T) {
-	databases := map[string]string{
-		"city": cityTestDB,
+	databases := map[string]config.Database{
+		"city": {Path: cityTestDB},
 	}
 
 	readers, err := mmdb.OpenDatabases(databases)
@@ -151,10 +150,9 @@ func TestEndToEnd_CSVExport_MultipleNetworkColumns(t *testing.T) {
 
 // TestEndToEnd_CSVExport_MultipleColumns tests CSV with multiple data columns.
 func TestEndToEnd_CSVExport_MultipleColumns(t *testing.T) {
-	databases := map[string]string{
-		"city": cityTestDB,
+	databases := map[string]config.Database{
+		"city": {Path: cityTestDB},
 	}
-
 	readers, err := mmdb.OpenDatabases(databases)
 	require.NoError(t, err)
 	defer readers.Close()
@@ -224,8 +222,8 @@ func TestEndToEnd_CSVExport_MultipleColumns(t *testing.T) {
 
 // TestEndToEnd_CSVExport_NilValues tests that nil values are handled correctly.
 func TestEndToEnd_CSVExport_NilValues(t *testing.T) {
-	databases := map[string]string{
-		"city": cityTestDB,
+	databases := map[string]config.Database{
+		"city": {Path: cityTestDB},
 	}
 
 	includeEmpty := true

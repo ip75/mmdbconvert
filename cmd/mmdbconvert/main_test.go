@@ -109,9 +109,9 @@ func TestValidateParquetNetworkColumns_IPv4SingleFileAllowed(t *testing.T) {
 }
 
 func openTestReaders(t *testing.T, cfg *config.Config) *mmdb.Readers {
-	paths := make(map[string]string, len(cfg.Databases))
+	paths := make(map[string]config.Database, len(cfg.Databases))
 	for _, db := range cfg.Databases {
-		paths[db.Name] = db.Path
+		paths[db.Name] = db
 	}
 	readers, err := mmdb.OpenDatabases(paths)
 	require.NoError(t, err)

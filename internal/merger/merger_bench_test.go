@@ -23,8 +23,11 @@ func (d *discardWriter) WriteRow(_ netip.Prefix, _ []mmdbtype.DataType) error {
 func BenchmarkMergerFullMerge(b *testing.B) {
 	dbPath := "../../testdata/MaxMind-DB/test-data/GeoIP2-City-Test.mmdb"
 
-	databases := map[string]string{
-		"city": dbPath,
+	databases := map[string]config.Database{
+		"city": {
+			Name: "city",
+			Path: dbPath,
+		},
 	}
 
 	cfg := &config.Config{

@@ -158,11 +158,11 @@ func run(configPath string, quiet, disableCache bool) error {
 		fmt.Println("Opening MMDB databases...")
 	}
 
-	databases := map[string]string{}
+	databases := make(map[string]config.Database, len(cfg.Databases))
 	for _, db := range cfg.Databases {
-		databases[db.Name] = db.Path
+		databases[db.Name] = db
 		if !quiet {
-			fmt.Printf("  - %s: %s\n", db.Name, db.Path)
+			fmt.Printf("  - %s: %s (priority: %d)\n", db.Name, db.Path, db.Priority)
 		}
 	}
 

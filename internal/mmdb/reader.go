@@ -7,22 +7,26 @@ import (
 	"net/netip"
 
 	"github.com/oschwald/maxminddb-golang/v2"
+
+	"github.com/maxmind/mmdbconvert/internal/config"
 )
 
 // Reader wraps a maxminddb.Reader with additional functionality.
 type Reader struct {
-	reader *maxminddb.Reader
+	reader   *maxminddb.Reader
+	priority int
 }
 
 // Open opens an MMDB database file.
-func Open(path string) (*Reader, error) {
-	reader, err := maxminddb.Open(path)
+func Open(db config.Database) (*Reader, error) {
+	reader, err := maxminddb.Open(db.Path)
 	if err != nil {
-		return nil, fmt.Errorf("opening MMDB file '%s': %w", path, err)
+		return nil, fmt.Errorf("opening MMDB file '%s': %w", db.Path, err)
 	}
 
 	return &Reader{
-		reader: reader,
+		reader:   reader,
+		priority: db.Priority,
 	}, nil
 }
 
@@ -52,17 +56,21 @@ func (r *Reader) Metadata() maxminddb.Metadata {
 	return r.reader.Metadata
 }
 
+func (r *Reader) Priority() int {
+	return r.priority
+}
+
 // Readers manages multiple MMDB database readers.
 type Readers struct {
 	readers map[string]*Reader // database name -> reader
 }
 
 // OpenDatabases opens multiple MMDB databases.
-func OpenDatabases(databases map[string]string) (*Readers, error) {
+func OpenDatabases(databases map[string]config.Database) (*Readers, error) {
 	readers := map[string]*Reader{}
 
-	for name, path := range databases {
-		reader, err := Open(path)
+	for name, db := range databases {
+		reader, err := Open(db)
 		if err != nil {
 			// Close any already opened readers
 			for _, r := range readers {

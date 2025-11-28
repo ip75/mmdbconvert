@@ -26,8 +26,10 @@ func boolPtr(v bool) *bool {
 
 func TestMerger_SingleDatabase(t *testing.T) {
 	// Open test database
-	databases := map[string]string{
-		"city": cityTestDB,
+	databases := map[string]config.Database{
+		"city": {
+			Path: cityTestDB,
+		},
 	}
 
 	readers, err := mmdb.OpenDatabases(databases)
@@ -66,7 +68,7 @@ func TestMerger_SingleDatabase(t *testing.T) {
 }
 
 func TestSimpleReaderIteration(t *testing.T) {
-	reader, err := mmdb.Open(cityTestDB)
+	reader, err := mmdb.Open(config.Database{Path: cityTestDB})
 	require.NoError(t, err)
 	defer reader.Close()
 
@@ -84,9 +86,13 @@ func TestSimpleReaderIteration(t *testing.T) {
 
 func TestMerger_MultipleDatabases(t *testing.T) {
 	// Open test databases
-	databases := map[string]string{
-		"city": cityTestDB,
-		"anon": anonTestDB,
+	databases := map[string]config.Database{
+		"city": {
+			Path: cityTestDB,
+		},
+		"anon": {
+			Path: anonTestDB,
+		},
 	}
 
 	readers, err := mmdb.OpenDatabases(databases)
@@ -134,9 +140,13 @@ var errStopIteration = errors.New("test stop iteration")
 func TestMerger_EmitsNetworksPresentOnlyInLaterDatabase(t *testing.T) {
 	// Domain has structural gaps that City fills. When Domain columns are
 	// requested first, we still expect City-only ranges to be emitted.
-	databases := map[string]string{
-		"domain": testDataDir + "/GeoIP2-Domain-Test.mmdb",
-		"city":   cityTestDB,
+	databases := map[string]config.Database{
+		"city": {
+			Path: cityTestDB,
+		},
+		"domain": {
+			Path: testDataDir + "/GeoIP2-Domain-Test.mmdb",
+		},
 	}
 
 	readers, err := mmdb.OpenDatabases(databases)
@@ -177,10 +187,11 @@ func TestMerger_AdjacentNetworkMerging(t *testing.T) {
 	// This test verifies that adjacent networks with identical data are merged
 	// We'll use a small test database and verify the output is consolidated
 
-	databases := map[string]string{
-		"test": ipv4TestDB,
+	databases := map[string]config.Database{
+		"test": {
+			Path: ipv4TestDB,
+		},
 	}
-
 	readers, err := mmdb.OpenDatabases(databases)
 	require.NoError(t, err)
 	defer readers.Close()
@@ -227,8 +238,10 @@ func TestMerger_AdjacentNetworkMerging(t *testing.T) {
 
 func TestMerger_MissingDatabase(t *testing.T) {
 	// Open one database
-	databases := map[string]string{
-		"city": cityTestDB,
+	databases := map[string]config.Database{
+		"city": {
+			Path: cityTestDB,
+		},
 	}
 
 	readers, err := mmdb.OpenDatabases(databases)
@@ -257,9 +270,13 @@ func TestMerger_MissingDatabase(t *testing.T) {
 }
 
 func TestMerger_MixedIPVersionsFails(t *testing.T) {
-	databases := map[string]string{
-		"ipv4": testDataDir + "/MaxMind-DB-test-ipv4-24.mmdb",
-		"ipv6": testDataDir + "/MaxMind-DB-test-ipv6-32.mmdb",
+	databases := map[string]config.Database{
+		"ipv4": {
+			Path: testDataDir + "/MaxMind-DB-test-ipv4-24.mmdb",
+		},
+		"ipv6": {
+			Path: testDataDir + "/MaxMind-DB-test-ipv6-32.mmdb",
+		},
 	}
 
 	readers, err := mmdb.OpenDatabases(databases)
@@ -279,8 +296,10 @@ func TestMerger_MixedIPVersionsFails(t *testing.T) {
 }
 
 func TestMerger_NoColumns(t *testing.T) {
-	databases := map[string]string{
-		"city": cityTestDB,
+	databases := map[string]config.Database{
+		"city": {
+			Path: cityTestDB,
+		},
 	}
 
 	readers, err := mmdb.OpenDatabases(databases)
@@ -302,8 +321,10 @@ func TestMerger_NoColumns(t *testing.T) {
 
 func TestMerger_NilValues(t *testing.T) {
 	// Test that nil values (missing data) are handled correctly
-	databases := map[string]string{
-		"city": cityTestDB,
+	databases := map[string]config.Database{
+		"city": {
+			Path: cityTestDB,
+		},
 	}
 
 	readers, err := mmdb.OpenDatabases(databases)
@@ -396,9 +417,13 @@ func TestGetUniqueDatabaseNames(t *testing.T) {
 // TestMerger_ResultAlignment verifies that results[i] always corresponds to
 // readersList[i] even when networks have different specificities.
 func TestMerger_ResultAlignment(t *testing.T) {
-	databases := map[string]string{
-		"city": cityTestDB,
-		"anon": anonTestDB,
+	databases := map[string]config.Database{
+		"city": {
+			Path: cityTestDB,
+		},
+		"anon": {
+			Path: anonTestDB,
+		},
 	}
 
 	readers, err := mmdb.OpenDatabases(databases)
@@ -433,9 +458,13 @@ func TestMerger_ResultAlignment(t *testing.T) {
 // than effectivePrefix. This happens when one database has a less specific
 // network that still covers the effective network being processed.
 func TestMerger_BroaderDatabase(t *testing.T) {
-	databases := map[string]string{
-		"city": cityTestDB,
-		"anon": anonTestDB,
+	databases := map[string]config.Database{
+		"city": {
+			Path: cityTestDB,
+		},
+		"anon": {
+			Path: anonTestDB,
+		},
 	}
 
 	readers, err := mmdb.OpenDatabases(databases)
@@ -475,9 +504,13 @@ func TestMerger_BroaderDatabase(t *testing.T) {
 // TestMerger_MissingData verifies handling when a database has no data for
 // certain networks. With IncludeNetworksWithoutData, we get notFound Results.
 func TestMerger_MissingData(t *testing.T) {
-	databases := map[string]string{
-		"city": cityTestDB,
-		"anon": anonTestDB,
+	databases := map[string]config.Database{
+		"city": {
+			Path: cityTestDB,
+		},
+		"anon": {
+			Path: anonTestDB,
+		},
 	}
 
 	readers, err := mmdb.OpenDatabases(databases)
@@ -533,9 +566,13 @@ func TestMerger_MissingData(t *testing.T) {
 // showed that Lookup() calls dropped from 19% of CPU time to near-zero after this
 // optimization. This test ensures the code path works correctly.
 func TestMerger_NoRedundantLookups(t *testing.T) {
-	databases := map[string]string{
-		"city": cityTestDB,
-		"anon": anonTestDB,
+	databases := map[string]config.Database{
+		"city": {
+			Path: cityTestDB,
+		},
+		"anon": {
+			Path: anonTestDB,
+		},
 	}
 
 	readers, err := mmdb.OpenDatabases(databases)
@@ -604,7 +641,7 @@ func TestMerger_NoRedundantLookups(t *testing.T) {
 // IncludeNetworksWithoutData, NetworksWithin always yields at least one
 // Result per database, even if that Result has Found() == false.
 func TestMerger_IncludeNetworksWithoutDataGuarantees(t *testing.T) {
-	reader, err := mmdb.Open(cityTestDB)
+	reader, err := mmdb.Open(config.Database{Path: cityTestDB})
 	require.NoError(t, err)
 	defer reader.Close()
 
@@ -632,9 +669,13 @@ func TestMerger_IncludeNetworksWithoutDataGuarantees(t *testing.T) {
 		"NetworksWithin with IncludeNetworksWithoutData should yield at least one Result")
 
 	// Now test with a network that likely has no data in a second database
-	databases := map[string]string{
-		"city": cityTestDB,
-		"anon": anonTestDB,
+	databases := map[string]config.Database{
+		"city": {
+			Path: cityTestDB,
+		},
+		"anon": {
+			Path: anonTestDB,
+		},
 	}
 
 	readers, err := mmdb.OpenDatabases(databases)
@@ -695,7 +736,9 @@ func TestWalkPathReturnsErrorOnTypeMismatch(t *testing.T) {
 }
 
 func TestDecodeOnceMatchesDecodePath(t *testing.T) {
-	reader, err := mmdb.Open(testDataDir + "/GeoIP2-Enterprise-Test.mmdb")
+	reader, err := mmdb.Open(config.Database{
+		Path: testDataDir + "/GeoIP2-Enterprise-Test.mmdb",
+	})
 	require.NoError(t, err)
 	defer reader.Close()
 

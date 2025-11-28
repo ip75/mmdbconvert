@@ -6,6 +6,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/maxmind/mmdbconvert/internal/config"
 )
 
 const (
@@ -46,7 +48,7 @@ func TestOpen(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			reader, err := Open(tt.path)
+			reader, err := Open(config.Database{Path: tt.path})
 			if tt.wantErr {
 				require.Error(t, err)
 				assert.Nil(t, reader)
@@ -60,7 +62,7 @@ func TestOpen(t *testing.T) {
 }
 
 func TestReader_Close(t *testing.T) {
-	reader, err := Open(cityTestDB)
+	reader, err := Open(config.Database{Path: cityTestDB})
 	require.NoError(t, err)
 
 	err = reader.Close()
@@ -68,7 +70,7 @@ func TestReader_Close(t *testing.T) {
 }
 
 func TestReader_Metadata(t *testing.T) {
-	reader, err := Open(cityTestDB)
+	reader, err := Open(config.Database{Path: cityTestDB})
 	require.NoError(t, err)
 	defer reader.Close()
 
@@ -81,41 +83,53 @@ func TestReader_Metadata(t *testing.T) {
 func TestOpenDatabases(t *testing.T) {
 	tests := []struct {
 		name      string
-		databases map[string]string
+		databases map[string]config.Database
 		wantErr   bool
 	}{
 		{
 			name:      "empty databases map",
-			databases: map[string]string{},
+			databases: map[string]config.Database{},
 			wantErr:   false,
 		},
 		{
 			name: "single valid database",
-			databases: map[string]string{
-				"city": cityTestDB,
+			databases: map[string]config.Database{
+				"city": {
+					Path: cityTestDB,
+				},
 			},
 			wantErr: false,
 		},
 		{
 			name: "multiple valid databases",
-			databases: map[string]string{
-				"city": cityTestDB,
-				"anon": anonTestDB,
+			databases: map[string]config.Database{
+				"city": {
+					Path: cityTestDB,
+				},
+				"anon": {
+					Path: anonTestDB,
+				},
 			},
 			wantErr: false,
 		},
 		{
 			name: "single non-existent database",
-			databases: map[string]string{
-				"test": "/nonexistent/database.mmdb",
+			databases: map[string]config.Database{
+				"test": {
+					Path: "/nonexistent/database.mmdb",
+				},
 			},
 			wantErr: true,
 		},
 		{
 			name: "multiple databases with one invalid",
-			databases: map[string]string{
-				"valid":   cityTestDB,
-				"invalid": "/nonexistent/invalid.mmdb",
+			databases: map[string]config.Database{
+				"valid": {
+					Path: cityTestDB,
+				},
+				"invalid": {
+					Path: "/nonexistent/invalid.mmdb",
+				},
 			},
 			wantErr: true,
 		},
@@ -137,9 +151,13 @@ func TestOpenDatabases(t *testing.T) {
 }
 
 func TestReaders_Get(t *testing.T) {
-	databases := map[string]string{
-		"city": cityTestDB,
-		"anon": anonTestDB,
+	databases := map[string]config.Database{
+		"city": {
+			Path: cityTestDB,
+		},
+		"anon": {
+			Path: anonTestDB,
+		},
 	}
 
 	readers, err := OpenDatabases(databases)
@@ -169,9 +187,13 @@ func TestReaders_Close(t *testing.T) {
 	})
 
 	t.Run("close multiple readers", func(t *testing.T) {
-		databases := map[string]string{
-			"city": cityTestDB,
-			"anon": anonTestDB,
+		databases := map[string]config.Database{
+			"city": {
+				Path: cityTestDB,
+			},
+			"anon": {
+				Path: anonTestDB,
+			},
 		}
 
 		readers, err := OpenDatabases(databases)
@@ -183,7 +205,7 @@ func TestReaders_Close(t *testing.T) {
 }
 
 func TestReader_Networks(t *testing.T) {
-	reader, err := Open(ipv4TestDB)
+	reader, err := Open(config.Database{Path: ipv4TestDB})
 	require.NoError(t, err)
 	defer reader.Close()
 
@@ -198,10 +220,9 @@ func TestReader_Networks(t *testing.T) {
 }
 
 func TestReader_NetworksWithin(t *testing.T) {
-	reader, err := Open(cityTestDB)
+	reader, err := Open(config.Database{Path: cityTestDB})
 	require.NoError(t, err)
 	defer reader.Close()
-
 	// Test with a prefix that should contain some networks
 	searchPrefix := netip.MustParsePrefix("81.2.69.0/24")
 

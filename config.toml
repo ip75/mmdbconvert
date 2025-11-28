@@ -10,10 +10,12 @@ record_size = 28
 [[databases]]
 name = "russia"
 path = "RU-GeoIP-Country.mmdb"
+priority = 10
 
 [[databases]]
 name = "world"
 path = "GeoLite2-Country.mmdb"
+priority = 0
 
 [[columns]]
 name = "country_code_world"
