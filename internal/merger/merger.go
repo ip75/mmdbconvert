@@ -319,6 +319,12 @@ func (m *Merger) extractAndProcess(
 	// Clear the working slice before reuse
 	clear(m.workingSlice)
 
+	var (
+		priority          int
+		priorityExtractor *columnExtractor
+		priorityRecord    mmdbtype.Map
+	)
+
 	for _, extractor := range m.extractors {
 		// Check if reader was resolved during initialization
 		if extractor.reader == nil {
@@ -340,19 +346,27 @@ func (m *Merger) extractAndProcess(
 			continue // No data in this database for this network
 		}
 
+		// find the record with max priority
+		if priority < extractor.reader.Priority() {
+			priority = extractor.reader.Priority()
+			priorityExtractor = &extractor
+			priorityRecord = record
+		}
+	}
+
+	if priorityExtractor != nil {
 		// Walk the path in the cached record to extract the value
-		value, err := walkPath(record, extractor.path)
+		value, err := walkPath(priorityRecord, priorityExtractor.path)
 		if err != nil {
 			return fmt.Errorf(
 				"decoding path for column '%s': %w",
-				extractor.name,
+				priorityExtractor.name,
 				err,
 			)
 		}
-
 		// Store value at column index (nil values are OK - they indicate missing data)
 		if value != nil {
-			m.workingSlice[extractor.colIndex] = value
+			m.workingSlice[priorityExtractor.colIndex] = value
 		}
 	}
 
